@@ -18,7 +18,7 @@ from utils.async_utils import run_async
 
 logger = logging.getLogger(__name__)
 
-ENGINE_TIMEOUT = 10
+ENGINE_TIMEOUT = 45
 
 ENGINE_WEIGHTS = {
     "darksearch": 1.0,
@@ -71,7 +71,7 @@ DEFAULT_SEARCH_ENGINES = [e["url"] for e in SEARCH_ENGINES]
 _ONION_URL_RE = re.compile(r'https?:\/\/[a-z0-9.]+\.onion', re.IGNORECASE)
 
 MAX_CONCURRENT = 10
-SEARCH_TIMEOUT = 30
+SEARCH_TIMEOUT = 60
 ENGINE_RETRY_COUNT = 2
 
 _ENGINE_STATUS: dict[str, dict] = {}
