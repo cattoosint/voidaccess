@@ -1,0 +1,59 @@
+# VoidAccess — local development stack
+#
+# Services:
+#   voidaccess     — Streamlit app (port 8501)
+#   postgres  — PostgreSQL 16 (host port 5433 → container 5432; avoids clash with local PostgreSQL on Windows)
+#
+# Tor is NOT containerised here; it runs on the host.
+# The voidaccess service reaches it via host.docker.internal:9050.
+# When a dedicated tor service is added (Phase 1C), set TOR_PROXY_HOST=tor
+# in the voidaccess environment block and add the service below.
+#
+# Usage:
+#   docker compose up --build        # first run
+#   docker compose up -d             # detached
+#   docker compose down              # stop and remove containers
+#   docker compose down -v           # also delete the postgres volume
+
+services:
+
+  voidaccess:
+    build: .
+    ports:
+      - "8501:8501"
+    env_file: .env
+    environment:
+      # Point at the postgres service defined below
+      DATABASE_URL: postgresql://voidaccess:voidaccess@postgres:5432/voidaccess
+      # Reach host Tor daemon from inside the container
+      TOR_PROXY_HOST: host.docker.internal
+      TOR_PROXY_PORT: "9050"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./investigations:/app/investigations
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: voidaccess
+      POSTGRES_USER: voidaccess
+      POSTGRES_PASSWORD: voidaccess
+    ports:
+      # Host 5433: use 5432 on the host only if no other Postgres is listening there
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voidaccess -d voidaccess"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

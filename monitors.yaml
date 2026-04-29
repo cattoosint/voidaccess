@@ -1,0 +1,10 @@
+watches:
+- alert_on: new_results
+  email: null
+  enabled: true
+  interval_hours: 24.0
+  name: test1
+  query: test1
+  telegram_chat_id: null
+  type: keyword
+  webhook_url: null

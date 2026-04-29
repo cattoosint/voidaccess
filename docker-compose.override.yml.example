@@ -1,0 +1,13 @@
+# Docker Compose Override Example
+# Copy this file to docker-compose.override.yml (not committed) for local development.
+# WARNING: This file contains placeholder credentials for LOCAL DEV ONLY.
+# Do NOT commit this file to version control.
+
+services:
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: dev_password_change_in_production
+
+  fastapi:
+    environment:
+      JWT_SECRET: dev-jwt-secret-change-in-production
