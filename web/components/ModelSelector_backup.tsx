@@ -125,7 +125,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const [focusedIndex, setFocusedIndex] = useState(-1);
 
-  // ── Fetch model list ──────────────────────────────────────────────────────
+  // -- Fetch model list ------------------------------------------------------
 
   const fetchModelList = useCallback(async (force = false) => {
     if (!force) {
@@ -152,7 +152,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
 
   useEffect(() => { void fetchModelList(); }, [fetchModelList]);
 
-  // ── Close on outside click ────────────────────────────────────────────────
+  // -- Close on outside click ------------------------------------------------
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -164,7 +164,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // ── Focus search on open ──────────────────────────────────────────────────
+  // -- Focus search on open --------------------------------------------------
 
   useEffect(() => {
     if (isOpen && mode === "browse") {
@@ -172,7 +172,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
     }
   }, [isOpen, mode]);
 
-  // ── Debounced validation ──────────────────────────────────────────────────
+  // -- Debounced validation --------------------------------------------------
 
   const triggerValidation = useCallback((id: string) => {
     if (validateTimer.current) clearTimeout(validateTimer.current);
@@ -206,7 +206,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
     if (v.trim()) onChange(v.trim());
   };
 
-  // ── Flat filterable model list for browse mode ────────────────────────────
+  // -- Flat filterable model list for browse mode ----------------------------
 
   const allModels: (ModelInfo & { providerName: string })[] = [];
   if (modelList) {
@@ -237,7 +237,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
     }
   }
 
-  // ── Keyboard navigation ───────────────────────────────────────────────────
+  // -- Keyboard navigation ---------------------------------------------------
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isOpen) return;
@@ -256,7 +256,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
     }
   };
 
-  // ── Derived display name ──────────────────────────────────────────────────
+  // -- Derived display name --------------------------------------------------
 
   const displayName = (() => {
     if (!value) return "Select model";
@@ -264,28 +264,28 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
     return found ? found.name : parseModelDisplayName(value);
   })();
 
-  // ── Check if no keys configured at all ───────────────────────────────────
+  // -- Check if no keys configured at all -----------------------------------
 
   const noKeysConfigured =
     modelList !== null && modelList.providers.every((p) => !p.configured);
 
-  // ── Mode C: No key banner ─────────────────────────────────────────────────
+  // -- Mode C: No key banner -------------------------------------------------
 
   if (noKeysConfigured && !loadingList) {
     return (
       <div className="flex items-center gap-2 rounded-md border border-[var(--warning)]/40 bg-[var(--warning)]/10 px-3 py-2 text-[11px]">
-        <span className="text-[var(--warning)]">⚠</span>
+        <span className="text-[var(--warning)]">?</span>
         <span className="text-[var(--text-secondary)]">
           No LLM provider configured.{" "}
           <Link href="/settings" className="text-[var(--accent)] hover:underline">
-            Add an API key in Settings →
+            Add an API key in Settings ?
           </Link>
         </span>
       </div>
     );
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // -- Render ----------------------------------------------------------------
 
   return (
     <div ref={containerRef} className="relative" onKeyDown={handleKeyDown}>
@@ -350,7 +350,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
             </button>
           </div>
 
-          {/* ── Mode A: Browse ── */}
+          {/* -- Mode A: Browse -- */}
           {mode === "browse" && (
             <>
               {/* Search */}
@@ -374,111 +374,18 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
                       onClick={() => setSearch("")}
                       className="shrink-0 text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                     >
-                      ×
+                      �
                     </button>
-                  )}
-                </div>
-              </div>
+)}
+        </div>
 
-              {/* Model list */}
-              <div ref={listRef} className="overflow-y-auto" style={{ maxHeight: "340px" }}>
-                {loadingList && (
-                  <div className="py-8 text-center font-mono text-[11px] text-[var(--text-muted)]">
-                    Loading models…
-                  </div>
-                )}
-                {listError && (
-                  <div className="py-4 px-3 font-mono text-[11px] text-[var(--error)]">
-                    {listError}
-                  </div>
-                )}
-                {!loadingList && !listError && grouped.length === 0 && (
-                  <div className="py-8 text-center font-mono text-[11px] text-[var(--text-muted)]">
-                    {search ? "No models match your search." : "No providers configured."}
-                  </div>
-                )}
-                {grouped.map(({ provider, models }) => (
-                  <div key={provider}>
-                    <div className="sticky top-0 z-10 bg-[var(--bg-surface)] px-3 py-1.5 font-mono text-[9px] font-semibold uppercase tracking-widest text-[var(--text-muted)]">
-                      {provider}
-                    </div>
-                    {models.map((m) => {
-                      const globalIdx = allModels.findIndex((am) => am.id === m.id);
-                      return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          role="option"
-                          aria-selected={value === m.id}
-                          onClick={() => { onChange(m.id); setIsOpen(false); }}
-                          className={`flex w-full items-start gap-2.5 px-3 py-2 text-left transition-colors ${
-                            value === m.id
-                              ? "bg-[var(--accent)]/10 text-[var(--accent)]"
-                              : focusedIndex === globalIdx
-                              ? "bg-[var(--bg-overlay)] text-[var(--text-primary)]"
-                              : "text-[var(--text-secondary)] hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)]"
-                          }`}
-                        >
-                          <span className="mt-0.5 font-mono text-[10px] leading-tight">{m.name}</span>
-                          <span className="ml-auto flex shrink-0 items-center gap-1.5 font-mono text-[9px]">
-                            {m.free_tier && (
-                              <span className="rounded bg-[var(--success)]/15 px-1 py-0.5 text-[var(--success)]">
-                                free
-                              </span>
-                            )}
-                            {m.recommended && (
-                              <span className="rounded bg-[var(--accent)]/15 px-1 py-0.5 text-[var(--accent)]">
-                                rec
-                              </span>
-                            )}
-                            {formatContextWindow(m.context_window) && (
-                              <span className="text-[var(--text-muted)]">{formatContextWindow(m.context_window)}</span>
-                            )}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* ── Mode B: Custom ── */}
-          {mode === "custom" && (
-            <div className="p-3">
-              <p className="mb-2 font-mono text-[10px] text-[var(--text-muted)]">
-                Enter any model ID supported by your configured providers.
-              </p>
-              <input
-                type="text"
-                value={customInput}
-                onChange={(e) => handleCustomInput(e.target.value)}
-                placeholder="e.g. openrouter/mistralai/mistral-7b-instruct"
-                className="w-full rounded-md border border-[var(--border-dim)] bg-[var(--bg-overlay)] px-3 py-1.5 font-mono text-[11px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--accent-border)]"
-              />
-              {validating && (
-                <p className="mt-1.5 font-mono text-[10px] text-[var(--text-muted)]">Validating…</p>
-              )}
-              {validateResult && (
-                <p className={`mt-1.5 font-mono text-[10px] ${validateResult.valid ? "text-[var(--success)]" : "text-[var(--error)]"}`}>
-                  {validateResult.valid ? `✓ ${validateResult.message}` : `✗ ${validateResult.message}`}
-                  {validateResult.suggestion && (
-                    <span className="block text-[var(--text-muted)]">Suggestion: {validateResult.suggestion}</span>
-                  )}
-                </p>
-              )}
-              <p className="mt-1 font-mono text-[9px] text-[var(--text-muted)]">
-                Default: DeepSeek Chat via OpenRouter (fast, affordable, no refusals)
-              </p>
-              <button
-                type="button"
-                disabled={!customInput.trim() || (validateResult !== null && !validateResult.valid)}
-                onClick={() => {
-                  if (customInput.trim()) {
-                    onChange(customInput.trim());
-                    setIsOpen(false);
-                  }
+        {/* Default model helper text */}
+        <p className="mt-1 font-mono text-[9px] text-[var(--text-muted)]">
+          Default: DeepSeek Chat via OpenRouter (fast, affordable, no refusals)
+        </p>
+      </div>
+    );
+  }
                 }}
                 className="mt-3 w-full rounded-md bg-[var(--accent)] px-3 py-1.5 font-mono text-[11px] font-semibold text-[var(--text-inverse)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
               >
@@ -491,3 +398,4 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
     </div>
   );
 }
+
