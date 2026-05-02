@@ -1,10 +1,10 @@
-# VoidAccess
+# <img src="./public/va_svg.svg" width="48" height="48" align="center" alt="VoidAccess Logo"> VoidAccess
 
 > **A self-hosted OSINT platform for dark web threat intelligence.**  
 > Automate the entire investigation workflow from query refinement to relationship mapping in 13 autonomous pipeline steps.
 
 <div align="center">
-  <video src="./screenshots/how-it-works.mp4" width="100%" controls autoplay loop muted></video>
+  <video src="./public/how-it-works.mp4" width="100%" controls autoplay loop muted></video>
 </div>
 
 ---
@@ -24,23 +24,23 @@ Commercial threat intelligence platforms often charge prohibitive annual fees fo
 
 ### 1. Intuitive Dashboard
 Start investigations with a clean, dark-themed interface designed for high-stakes research.
-![Homepage](./screenshots/homepage.png)
+![Homepage](./public/homepage.png)
 
 ### 2. Intelligent Scoping
 Refine queries and select investigation depth with precision.
-![Topic Selection](./screenshots/topic_selection.png)
+![Topic Selection](./public/topic_selection.png)
 
 ### 3. Real-time Pipeline Tracking
 Monitor the 13-step autonomous pipeline as it crawls and extracts intelligence.
-![Loading](./screenshots/loading.png)
+![Loading](./public/loading.png)
 
 ### 4. Interactive Graph Intelligence
 Explore connections between entities, onion sites, and threat actors in a dynamic, high-contrast graph.
-![Node Selection](./screenshots/node_selection.png)
+![Node Selection](./public/node_selection.png)
 
 ### 5. Comprehensive Intel Reports
 Get structured summaries and actionable artifacts once the scan completes.
-![Scan Completed](./screenshots/scan_completed.png)
+![Scan Completed](./public/scan_completed.png)
 
 ---
 
