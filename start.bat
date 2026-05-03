@@ -1,19 +1,10 @@
 @echo off
-:: Restart in a fresh cmd session so ANSI escape codes render correctly
-if not defined VA_COLORS_ENABLED (
-    set VA_COLORS_ENABLED=1
-    reg add HKCU\Console /v VirtualTerminalLevel /t REG_DWORD /d 1 /f >nul 2>&1
-    cmd /c "%~f0" %*
-    exit /b
-)
-
 setlocal enabledelayedexpansion
-chcp 65001 >nul
-cd /d "%~dp0"
+chcp 65001 >nul 2>&1
 
-:: ── Color setup ──────────────────────────────────────────────────────────────
-set "ESC="
-for /f %%a in ('echo prompt $E^| cmd') do set "ESC=%%a"
+:: Enable ANSI colors
+for /f %%a in ('echo prompt $E^| cmd') ^
+    do set "ESC=%%a"
 set "GREEN=%ESC%[0;32m"
 set "RED=%ESC%[0;31m"
 set "YELLOW=%ESC%[1;33m"
@@ -22,95 +13,94 @@ set "BOLD=%ESC%[1m"
 set "DIM=%ESC%[2m"
 set "NC=%ESC%[0m"
 
-:: ── Banner ────────────────────────────────────────────────────────────────────
-echo.
-echo %CYAN%  +===================================+%NC%
-echo %CYAN%  ^|  VoidAccess  ·  Starting up       ^|%NC%
-echo %CYAN%  +===================================+%NC%
-echo.
-
-:: ── Docker permission check ───────────────────────────────────────────────────
+:: Docker check
 docker info >nul 2>&1
 if errorlevel 1 (
-    echo %YELLOW%  [^!^!]%NC%  Docker not running or not found.
-    echo   %DIM%-^>%NC%  Start Docker Desktop and try again.
-    echo   %DIM%-^>%NC%  Download: https://docs.docker.com/get-docker/
-    pause
+    echo.
+    echo   %YELLOW%[!!]%NC%  Docker not running.
+    echo   %DIM% -> %NC% Start Docker Desktop first.
     exit /b 1
 )
 
-:: ── .env check ───────────────────────────────────────────────────────────────
-if not exist ".env" (
-    echo %YELLOW%  [^!^!]%NC%  No .env file found. Run setup first:
-    echo   %DIM%-^>%NC%  setup.bat
-    pause
+:: .env check
+if not exist .env (
+    echo.
+    echo   %RED%[!!]%NC%  .env not found.
+    echo   %DIM% -> %NC% Run setup.bat first.
     exit /b 1
 )
 
-:: ── Build ^& start ────────────────────────────────────────────────────────────
-echo %DIM%   -^>%NC%  Building containers...
-set DOCKER_BUILDKIT=1
-docker compose -f infra\docker-compose.yml --project-directory "%~dp0" --env-file "%~dp0.env" up --build -d > "%TEMP%\va_start.log" 2>&1
+:: Banner
+echo.
+echo   %CYAN%+===================================+%NC%
+echo   %CYAN%^|%NC%  %BOLD%VoidAccess%NC%  ·  Starting up       %CYAN%^|%NC%
+echo   %CYAN%+===================================+%NC%
+echo.
+
+:: Detect compose file
+set COMPOSE_FILE=infra\docker-compose.yml
+if not exist %COMPOSE_FILE% (
+    set COMPOSE_FILE=docker-compose.yml
+)
+
+echo   %DIM% -> %NC% Building and starting containers...
+echo   %DIM%    (first run: 3-5 min, cached after)%NC%
+echo.
+
+:: Run docker compose - wait for it
+docker compose -f %COMPOSE_FILE% ^
+    --project-directory . up --build ^
+    > "%TEMP%\va_start.log" 2>&1
+
 if errorlevel 1 (
-    echo %RED%  [^!^!]%NC%  Build failed — check %TEMP%\va_start.log
-    pause
+    echo   %RED%[!!]%NC%  Build failed.
+    echo   %DIM% -> %NC% Check: %TEMP%\va_start.log
+    type "%TEMP%\va_start.log" | ^
+        findstr /i "error failed"
     exit /b 1
 )
-echo %GREEN%  [OK]%NC%  Containers started
 
-:: ── Service health ────────────────────────────────────────────────────────────
+echo   %GREEN%[OK]%NC%  Build complete
 echo.
-echo %DIM%   -^>%NC%  Waiting for services...
+echo   %DIM% -> %NC% Checking services...
+echo.
 
+:: Check each service
 for %%S in (postgres tor fastapi nextjs) do (
-    set "READY=0"
-    for /l %%i in (1,1,30) do (
-        if "!READY!"=="0" (
-            docker inspect --format "{{.State.Health.Status}}" voidaccess-%%S >nul 2>&1
-            if not errorlevel 1 (
-                echo %GREEN%  [OK]%NC%  %%S
-                set "READY=1"
-            ) else (
-                timeout /t 2 /nobreak >nul
-            )
-        )
+    set "HEALTHY=0"
+    set "ATTEMPTS=0"
+    :wait_%%S
+    set /a ATTEMPTS+=1
+    if !ATTEMPTS! gtr 30 goto timeout_%%S
+
+    for /f "tokens=*" %%H in ('docker inspect ^
+        --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}running{{end}}" ^
+        voidaccess-%%S 2^>nul') do (
+        if "%%H"=="healthy" set "HEALTHY=1"
+        if "%%H"=="running" set "HEALTHY=1"
     )
-    if "!READY!"=="0" (
-        echo %YELLOW%  [^!^!]%NC%  %%S (timeout)
+
+    if "!HEALTHY!"=="1" (
+        echo   %GREEN%[OK]%NC%  %%S
+        goto done_%%S
     )
+    timeout /t 3 /nobreak >nul
+    goto wait_%%S
+
+    :timeout_%%S
+    echo   %YELLOW%[!!]%NC%  %%S - slow to start
+    :done_%%S
 )
 
-:: ── Wait for API ready ────────────────────────────────────────────────────────
 echo.
-set STATUS=
-set /a COUNT=0
-:WAIT
-if !COUNT! geq 60 goto SHOW_RESULT
-for /f "delims=" %%i in ('curl -s --max-time 5 http://localhost:8000/healthz/ready 2^>nul') do set RESPONSE=%%i
-echo !RESPONSE! | findstr /c:"ready" >nul 2>&1
-if not errorlevel 1 set STATUS=ready
-if "!STATUS!"=="ready" goto SHOW_RESULT
-set /a COUNT+=1
-timeout /t 5 /nobreak >nul
-goto WAIT
+echo   %GREEN%+===================================+%NC%
+echo   %GREEN%^|%NC%                                   %GREEN%^|%NC%
+echo   %GREEN%^|%NC%   %GREEN%[OK]%NC%  %BOLD%VoidAccess is ready!%NC%         %GREEN%^|%NC%
+echo   %GREEN%^|%NC%                                   %GREEN%^|%NC%
+echo   %GREEN%+===================================+%NC%
+echo   %GREEN%^|%NC%  UI   ->  http://localhost:3001   %GREEN%^|%NC%
+echo   %GREEN%^|%NC%  API  ->  http://localhost:8000   %GREEN%^|%NC%
+echo   %GREEN%+===================================+%NC%
+echo.
 
-:: ── Ready banner ──────────────────────────────────────────────────────────────
-:SHOW_RESULT
-if "!STATUS!"=="ready" (
-    echo.
-    echo %GREEN%  +===================================+%NC%
-    echo %GREEN%  ^|                                   ^|%NC%
-    echo %GREEN%  ^|   [OK]  VoidAccess is ready       ^|%NC%
-    echo %GREEN%  ^|                                   ^|%NC%
-    echo %GREEN%  ^|   UI  -^>  http://localhost:3001   ^|%NC%
-    echo %GREEN%  ^|   API -^>  http://localhost:8000   ^|%NC%
-    echo %GREEN%  ^|                                   ^|%NC%
-    echo %GREEN%  +===================================+%NC%
-    echo.
-) else (
-    echo %YELLOW%  [^!^!]%NC%  Services are taking longer than expected.
-    echo   %DIM%-^>%NC%  docker compose -f infra\docker-compose.yml --project-directory . ps
-    echo   %DIM%-^>%NC%  docker compose -f infra\docker-compose.yml --project-directory . logs -f
-)
-
-exit /b 0
+endlocal

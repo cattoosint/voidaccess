@@ -1,12 +1,7 @@
 #!/usr/bin/env bash
-# VoidAccess — start the full stack and wait until ready.
-# Usage: ./start.sh
-
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR"
-
+# Colors
 RED=$'\033[0;31m'
 GREEN=$'\033[0;32m'
 YELLOW=$'\033[1;33m'
@@ -15,128 +10,172 @@ BOLD=$'\033[1m'
 DIM=$'\033[2m'
 NC=$'\033[0m'
 
-print_ok()   { printf "${GREEN}  ✓${NC}  %s\n" "$1"; }
-print_warn() { printf "${YELLOW}  ⚠${NC}  %s\n" "$1"; }
-print_info() { printf "${DIM}  →${NC}  %s\n" "$1"; }
-
-# ── Python detection (python3 may be a Windows Store stub in Git Bash) ────────
-
-if echo '{}' | python3 -c "import sys,json; json.load(sys.stdin)" >/dev/null 2>&1; then
-    PYTHON=python3
-elif echo '{}' | python -c "import sys,json; json.load(sys.stdin)" >/dev/null 2>&1; then
-    PYTHON=python
-else
-    PYTHON=""
-fi
-
-_parse_status() {
-    if [ -n "$PYTHON" ]; then
-        "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); print(d.get('status',''))" 2>/dev/null
-    else
-        grep -o '"status":"ready"' | grep -o 'ready' || true
-    fi
+# Spinner function
+spin() {
+    local pid=$1
+    local msg="$2"
+    local frames='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local i=0
+    tput civis 2>/dev/null || true
+    while kill -0 "$pid" 2>/dev/null; do
+        local frame="${frames:$i:1}"
+        printf "\r  ${CYAN}%s${NC}  %s" \
+            "$frame" "$msg"
+        i=$(( (i + 1) % 10 ))
+        sleep 0.1
+    done
+    tput cnorm 2>/dev/null || true
+    printf "\r%-60s\r" " "
 }
 
-# ── Banner ────────────────────────────────────────────────────────────────────
-
-printf "\n"
-printf "${CYAN}"
-printf "  ╔═══════════════════════════════════╗\n"
-printf "  ║  VoidAccess  ·  Starting up       ║\n"
-printf "  ╚═══════════════════════════════════╝\n"
-printf "${NC}\n"
-
-# ── Docker permission check ───────────────────────────────────────────────────
-
+# Docker permission check
 if ! docker info > /dev/null 2>&1; then
     if sudo docker info > /dev/null 2>&1; then
-        printf "\n  ${YELLOW}⚠${NC}  Docker requires sudo on this system.\n"
-        printf "  ${DIM}→${NC}  Re-run with: ${BOLD}sudo bash start.sh${NC}\n\n"
+        printf "\n  ${YELLOW}⚠${NC}  "
+        printf "Docker requires sudo.\n"
+        printf "  ${DIM}→${NC}  Re-run with: "
+        printf "${BOLD}sudo bash start.sh${NC}\n\n"
         exit 1
     else
-        printf "\n  ${RED}✗${NC}  Docker not found or not running.\n"
-        printf "  ${DIM}→${NC}  Install: ${DIM}https://docs.docker.com/get-docker/${NC}\n\n"
+        printf "\n  ${RED}✗${NC}  "
+        printf "Docker not running or not installed.\n"
         exit 1
     fi
 fi
 
-if [ ! -f "$SCRIPT_DIR/.env" ]; then
-    print_warn "No .env file found. Run setup.sh first:"
-    printf "    ${DIM}bash setup.sh${NC}\n"
+# Check .env exists
+if [ ! -f .env ]; then
+    printf "\n  ${RED}✗${NC}  .env not found.\n"
+    printf "  ${DIM}→${NC}  Run setup first: "
+    printf "${BOLD}bash setup.sh${NC}\n\n"
     exit 1
 fi
 
-# ── Build & start ─────────────────────────────────────────────────────────────
-
-printf "  ${DIM}→${NC}  Building containers...\n"
-DOCKER_BUILDKIT=1 docker compose -f "$SCRIPT_DIR/infra/docker-compose.yml" \
-    --project-directory "$SCRIPT_DIR" \
-    --env-file "$SCRIPT_DIR/.env" \
-    up --build -d \
-    > /tmp/va_start.log 2>&1
-START_EXIT=$?
-
-if [ $START_EXIT -eq 0 ]; then
-    printf "  ${GREEN}✓${NC}  Containers started\n"
-else
-    printf "  ${RED}✗${NC}  Build failed — check /tmp/va_start.log\n"
-    tail -20 /tmp/va_start.log
+# Check JWT_SECRET is not weak
+JWT=$(grep "^JWT_SECRET=" .env 2>/dev/null \
+    | cut -d= -f2-)
+if [ -z "$JWT" ] || [ ${#JWT} -lt 32 ]; then
+    printf "\n  ${RED}✗${NC}  JWT_SECRET missing "
+    printf "or too short.\n"
+    printf "  ${DIM}→${NC}  Re-run: "
+    printf "${BOLD}bash setup.sh${NC}\n\n"
     exit 1
 fi
 
-# ── Service health ────────────────────────────────────────────────────────────
-
+# Banner
 printf "\n"
-printf "  ${DIM}→${NC}  Waiting for services...\n"
+printf "  ${CYAN}╔═══════════════════════════════════╗${NC}\n"
+printf "  ${CYAN}║${NC}  ${BOLD}VoidAccess${NC}  ·  Starting up       "
+printf "${CYAN}║${NC}\n"
+printf "  ${CYAN}╚═══════════════════════════════════╝${NC}\n\n"
 
-for SVC in postgres tor fastapi nextjs; do
-    FOUND=false
-    for i in $(seq 1 30); do
+# Determine docker-compose file location
+COMPOSE_FILE="infra/docker-compose.yml"
+if [ ! -f "$COMPOSE_FILE" ]; then
+    COMPOSE_FILE="docker-compose.yml"
+fi
+
+COMPOSE_CMD="docker compose -f $COMPOSE_FILE \
+    --project-directory ."
+
+# Build and start - FOREGROUND with output hidden
+printf "  ${DIM}→${NC}  Building containers"
+printf " (first run: 3-5 min, cached after)...\n\n"
+
+$COMPOSE_CMD up --build \
+    > /tmp/va_start.log 2>&1
+BUILD_EXIT=$?
+
+if [ $BUILD_EXIT -ne 0 ]; then
+    printf "  ${RED}✗${NC}  Build failed.\n"
+    printf "  ${DIM}→${NC}  Last 20 lines of output:\n\n"
+    tail -20 /tmp/va_start.log | \
+        sed 's/^/      /'
+    printf "\n  ${DIM}→${NC}  Full log: "
+    printf "/tmp/va_start.log\n\n"
+    exit 1
+fi
+
+printf "  ${GREEN}✓${NC}  Build complete\n\n"
+
+# Wait for each service to become healthy
+printf "  ${DIM}→${NC}  Waiting for services...\n\n"
+
+SERVICES=("postgres" "tor" "fastapi" "nextjs")
+LABELS=("PostgreSQL" "Tor" "FastAPI" "Next.js")
+ALL_HEALTHY=true
+
+for i in "${!SERVICES[@]}"; do
+    SVC="${SERVICES[$i]}"
+    LABEL="${LABELS[$i]}"
+    HEALTHY=false
+
+    for attempt in $(seq 1 60); do
+        # Check container exists first
+        if ! docker inspect \
+           "voidaccess-${SVC}" \
+           > /dev/null 2>&1; then
+            sleep 2
+            continue
+        fi
+
         STATE=$(docker inspect \
-            --format='{{.State.Health.Status}}' \
-            voidaccess-$SVC 2>/dev/null || echo "starting")
-        if [ "$STATE" = "healthy" ] || [ "$STATE" = "running" ]; then
-            printf "  ${GREEN}✓${NC}  $SVC\n"
-            FOUND=true
+            --format='{{.State.Status}}' \
+            "voidaccess-${SVC}" 2>/dev/null)
+        HEALTH=$(docker inspect \
+            --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
+            "voidaccess-${SVC}" 2>/dev/null)
+
+        # Container is good if:
+        # - health check says healthy, OR
+        # - running with no health check
+        if [ "$HEALTH" = "healthy" ] || \
+           { [ "$STATE" = "running" ] && \
+             [ "$HEALTH" = "none" ]; }; then
+            printf "  ${GREEN}✓${NC}  $LABEL\n"
+            HEALTHY=true
             break
         fi
-        sleep 2
+
+        # Show waiting indicator
+        printf "\r  ${CYAN}·${NC}  $LABEL — "
+        printf "waiting (${attempt}/60)...   "
+        sleep 3
     done
-    if [ "$FOUND" = false ]; then
-        printf "  ${YELLOW}⚠${NC}  $SVC (timeout)\n"
+
+    # Clear the waiting line
+    printf "\r%-60s\r" " "
+
+    if [ "$HEALTHY" = "false" ]; then
+        printf "  ${YELLOW}⚠${NC}  $LABEL — "
+        printf "not healthy after 3 minutes\n"
+        ALL_HEALTHY=false
     fi
 done
-
-# ── Wait for API ready ────────────────────────────────────────────────────────
 
 printf "\n"
 
-STATUS=""
-for i in $(seq 1 60); do
-    _HEALTH=$(curl -s --max-time 5 http://localhost:8000/healthz/ready 2>/dev/null || echo "")
-    STATUS=$(echo "$_HEALTH" | _parse_status)
-    if [ "$STATUS" = "ready" ]; then
-        break
-    fi
-    sleep 5
-done
-
-# ── Ready banner ──────────────────────────────────────────────────────────────
-
-if [ "$STATUS" = "ready" ]; then
-    printf "\n${GREEN}"
-    printf "  ╔═══════════════════════════════════╗\n"
-    printf "  ║                                   ║\n"
-    printf "  ║   ✓  VoidAccess is ready          ║\n"
-    printf "  ║                                   ║\n"
-    printf "  ╠═══════════════════════════════════╣\n"
-    printf "  ║  UI   →  http://localhost:3001    ║\n"
-    printf "  ║  API  →  http://localhost:8000    ║\n"
-    printf "  ║                                   ║\n"
-    printf "  ╚═══════════════════════════════════╝\n"
-    printf "${NC}\n"
+if [ "$ALL_HEALTHY" = "false" ]; then
+    printf "  ${YELLOW}⚠${NC}  Some services are slow.\n"
+    printf "  ${DIM}→${NC}  Check logs:\n"
+    printf "       ${DIM}sudo docker compose -f "
+    printf "$COMPOSE_FILE --project-directory "
+    printf ". logs -f${NC}\n\n"
 else
-    print_warn "Services are taking longer than expected."
-    printf "    ${DIM}docker compose -f infra/docker-compose.yml --project-directory . ps${NC}\n"
-    printf "    ${DIM}docker compose -f infra/docker-compose.yml --project-directory . logs -f${NC}\n"
+    # Ready banner
+    printf "  ${GREEN}╔═══════════════════════════════════╗${NC}\n"
+    printf "  ${GREEN}║${NC}                                   "
+    printf "${GREEN}║${NC}\n"
+    printf "  ${GREEN}║${NC}   ${GREEN}✓${NC}  ${BOLD}VoidAccess is ready!${NC}         "
+    printf "${GREEN}║${NC}\n"
+    printf "  ${GREEN}║${NC}                                   "
+    printf "${GREEN}║${NC}\n"
+    printf "  ${GREEN}╠═══════════════════════════════════╣${NC}\n"
+    printf "  ${GREEN}║${NC}  UI   →  http://localhost:3001   "
+    printf "${GREEN}║${NC}\n"
+    printf "  ${GREEN}║${NC}  API  →  http://localhost:8000   "
+    printf "${GREEN}║${NC}\n"
+    printf "  ${GREEN}║${NC}  Docs →  http://localhost:8000/docs "
+    printf "${GREEN}║${NC}\n"
+    printf "  ${GREEN}╚═══════════════════════════════════╝${NC}\n\n"
 fi

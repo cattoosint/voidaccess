@@ -46,6 +46,22 @@ show_progress() {
     printf "\r  ${GREEN}✓${NC}  %s\n" "$msg"
 }
 
+spin() {
+    local pid=$1
+    local msg="$2"
+    local frames='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local i=0
+    tput civis 2>/dev/null || true
+    while kill -0 "$pid" 2>/dev/null; do
+        local frame="${frames:$i:1}"
+        printf "\r  ${CYAN}%s${NC}  %s" "$frame" "$msg"
+        i=$(( (i + 1) % 10 ))
+        sleep 0.1
+    done
+    tput cnorm 2>/dev/null || true
+    printf "\r"
+}
+
 _prompt() {
     local prompt_text="$1"
     local default="$2"
@@ -331,7 +347,8 @@ case "$CHOICE" in
     1)
         printf "\n"
         prompt "Enter your Groq API key: "
-        GROQ_KEY="$(_prompt "" "")"
+        read -rs GROQ_KEY || GROQ_KEY=""
+        printf "\n"
         if [ -n "$GROQ_KEY" ]; then
             print_info "Testing Groq API key..."
             if test_api_key "groq" "https://api.groq.com/openai/v1/models" "Bearer $GROQ_KEY" "$GROQ_KEY"; then
@@ -352,7 +369,8 @@ case "$CHOICE" in
     2)
         printf "\n"
         prompt "Enter your OpenRouter API key: "
-        OPENROUTER_KEY="$(_prompt "" "")"
+        read -rs OPENROUTER_KEY || OPENROUTER_KEY=""
+        printf "\n"
         if [ -n "$OPENROUTER_KEY" ]; then
             print_info "Testing OpenRouter API key..."
             if test_api_key "openrouter" "https://openrouter.ai/api/v1/models" "Bearer $OPENROUTER_KEY" "$OPENROUTER_KEY"; then
@@ -373,7 +391,8 @@ case "$CHOICE" in
     3)
         printf "\n"
         prompt "Enter your Anthropic API key: "
-        ANTHROPIC_KEY="$(_prompt "" "")"
+        read -rs ANTHROPIC_KEY || ANTHROPIC_KEY=""
+        printf "\n"
         if [ -n "$ANTHROPIC_KEY" ]; then
             print_info "Testing Anthropic API key..."
             if test_api_key "anthropic" "https://api.anthropic.com/v1/models" "Bearer $ANTHROPIC_KEY" "$ANTHROPIC_KEY"; then
@@ -394,7 +413,8 @@ case "$CHOICE" in
     4)
         printf "\n"
         prompt "Enter your OpenAI API key: "
-        OPENAI_KEY="$(_prompt "" "")"
+        read -rs OPENAI_KEY || OPENAI_KEY=""
+        printf "\n"
         if [ -n "$OPENAI_KEY" ]; then
             print_info "Testing OpenAI API key..."
             if test_api_key "openai" "https://api.openai.com/v1/models" "Bearer $OPENAI_KEY" "$OPENAI_KEY"; then
@@ -415,7 +435,8 @@ case "$CHOICE" in
     5)
         printf "\n"
         prompt "Enter your Google AI API key: "
-        GOOGLE_KEY="$(_prompt "" "")"
+        read -rs GOOGLE_KEY || GOOGLE_KEY=""
+        printf "\n"
         if [ -n "$GOOGLE_KEY" ]; then
             print_info "Testing Google AI API key..."
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -498,7 +519,8 @@ print_info "Press Enter to skip any"
 printf "\n"
 
 prompt "AlienVault OTX API key (https://otx.alienvault.com): "
-OTX_KEY="$(_prompt "" "")"
+read -rs OTX_KEY || OTX_KEY=""
+printf "\n"
 if [ -n "$OTX_KEY" ]; then
     print_info "Testing OTX API key..."
     HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -521,7 +543,8 @@ fi
 
 printf "\n"
 prompt "VirusTotal API key (https://virustotal.com): "
-VT_KEY="$(_prompt "" "")"
+read -rs VT_KEY || VT_KEY=""
+printf "\n"
 if [ -n "$VT_KEY" ]; then
     print_info "Testing VirusTotal API key..."
     HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -547,33 +570,37 @@ fi
 # =============================================================================
 print_step "6" "Redis"
 
-print_info "Redis enables JWT token revocation and circuit breaker persistence."
-print_info "Recommended for production."
+print_info "Redis enables JWT token revocation and circuit breaker state."
+print_info "Recommended for production deployments. Skip for local/dev use."
 printf "\n"
+printf "  ${CYAN}▸${NC}  Is Redis available? [y/${BOLD}N${NC}]: "
 
-response="$(wait_for_key "Is Redis available" "N")"
-if [ "$response" = "Y" ] || [ "$response" = "y" ]; then
-    REDIS_URL="redis://localhost:6379/0"
-    prompt "Redis URL [$REDIS_URL]: "
-    REDIS_URL_INPUT="$(_prompt "" "$REDIS_URL")"
-    REDIS_URL="${REDIS_URL_INPUT:-$REDIS_URL}"
+read -r redis_answer || redis_answer="n"
 
-    print_info "Testing Redis..."
-    REDIS_TEST=$(redis-cli -u "$REDIS_URL" ping 2>/dev/null || echo "FAIL")
-    if [ "$REDIS_TEST" = "PONG" ]; then
-        env_update "REDIS_URL" "$REDIS_URL"
-        print_ok "Redis connection successful"
+if [ "$redis_answer" = "y" ] || [ "$redis_answer" = "Y" ]; then
+    printf "  ${CYAN}▸${NC}  Redis URL [redis://localhost:6379/0]: "
+    read -r redis_url || redis_url=""
+    redis_url="${redis_url:-redis://localhost:6379/0}"
+
+    print_info "Testing Redis connection..."
+    if python3 -c "
+import sys
+try:
+    import redis
+    r = redis.from_url('$redis_url')
+    r.ping()
+    sys.exit(0)
+except:
+    sys.exit(1)
+" 2>/dev/null; then
+        printf "  ${GREEN}✓${NC}  Redis connected\n"
+        env_update "REDIS_URL" "$redis_url"
     else
-        print_warn "Redis ping failed — check your Redis URL"
-        response="$(wait_for_key "Save anyway" "N")"
-        if [ "$response" = "Y" ] || [ "$response" = "y" ]; then
-            env_update "REDIS_URL" "$REDIS_URL"
-            print_info "Saved (untested)"
-        fi
+        printf "  ${YELLOW}⚠${NC}  Could not connect to Redis at $redis_url\n"
+        print_info "Continuing without Redis"
     fi
 else
-    print_info "OK — running without Redis."
-    print_info "Logout may not immediately invalidate tokens."
+    print_info "Skipping Redis — logout tokens valid until expiry"
 fi
 
 # =============================================================================
@@ -587,24 +614,31 @@ printf "\n"
 
 response="$(wait_for_key "Download MITRE ATT&CK now" "Y")"
 if [ "$response" != "N" ] && [ "$response" != "n" ]; then
-    print_info "Downloading MITRE ATT&CK STIX data..."
     MITRE_TMP="/tmp/voidaccess_mitre_attack.json"
 
-    if python3 -c "
-import urllib.request
+    python3 -c "
+import urllib.request, sys
 url = 'https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json'
-urllib.request.urlretrieve(url, '$MITRE_TMP')
-print('done')
-" 2>/dev/null; then
+try:
+    urllib.request.urlretrieve(url, '$MITRE_TMP')
+    sys.exit(0)
+except Exception:
+    sys.exit(1)
+" &
+    MITRE_PID=$!
+    spin $MITRE_PID "Downloading MITRE ATT&CK STIX data (~33MB)..."
+    wait $MITRE_PID
+    MITRE_EXIT=$?
+
+    if [ $MITRE_EXIT -eq 0 ]; then
         if [ -f "$MITRE_TMP" ]; then
-            if [ -d "$SCRIPT_DIR/cti_data" ] || mkdir -p "$SCRIPT_DIR/cti_data" 2>/dev/null; then
-                cp "$MITRE_TMP" "$SCRIPT_DIR/cti_data/enterprise-attack.json"
-                rm -f "$MITRE_TMP"
-                print_ok "MITRE ATT&CK cache seeded"
-            fi
+            mkdir -p "$SCRIPT_DIR/cti_data" 2>/dev/null
+            cp "$MITRE_TMP" "$SCRIPT_DIR/cti_data/enterprise-attack.json"
+            rm -f "$MITRE_TMP"
         fi
+        printf "  ${GREEN}✓${NC}  MITRE ATT&CK cache ready\n"
     else
-        print_warn "Download failed — will seed on first investigation"
+        printf "  ${YELLOW}⚠${NC}  Download failed — will retry on first investigation\n"
     fi
 fi
 
@@ -627,35 +661,53 @@ fi
 
 printf "\n"
 
+print_info "This takes 3-5 min on first run (cached after that)"
+printf "\n"
+
 DOCKER_BUILDKIT=1 docker compose -f infra/docker-compose.yml \
     --project-directory . \
     --env-file .env \
-    up --build -d &>/tmp/voidaccess_build.log &
-show_progress $! "Building and starting containers..."
+    up --build -d > /tmp/va_build.log 2>&1 &
+BUILD_PID=$!
+spin $BUILD_PID "Building containers (grab a coffee)..."
+wait $BUILD_PID
+BUILD_EXIT=$?
 
-print_info "Waiting for services to be ready..."
-printf "  "
-
-STATUS=""
-for i in $(seq 1 60); do
-    _HEALTH=$(curl -s --max-time 5 http://localhost:8000/healthz/ready 2>/dev/null || echo "")
-    STATUS=$(echo "$_HEALTH" | \
-        ${PY_CMD:-python3} -c "import sys,json; d=json.load(sys.stdin); print(d.get('status',''))" 2>/dev/null || \
-        echo "$_HEALTH" | grep -o '"status":"ready"' | grep -o 'ready' || echo "")
-    if [ "$STATUS" = "ready" ]; then
-        printf "\n"
-        print_ok "VoidAccess is ready"
-        break
-    fi
-    printf "."
-    sleep 5
-done
-
-if [ "$STATUS" != "ready" ]; then
-    printf "\n"
-    print_warn "Services may still be starting. Check status with:"
-    printf "    ${DIM}docker compose -f infra/docker-compose.yml --project-directory . logs -f${NC}\n"
+if [ $BUILD_EXIT -ne 0 ]; then
+    printf "  ${RED}✗${NC}  Build failed\n"
+    printf "  ${DIM}→${NC}  Details: cat /tmp/va_build.log\n"
+    tail -5 /tmp/va_build.log
+    exit 1
 fi
+printf "  ${GREEN}✓${NC}  Containers built\n\n"
+
+SERVICES=("postgres" "tor" "fastapi" "nextjs")
+SERVICE_LABELS=("PostgreSQL" "Tor" "FastAPI" "Next.js")
+
+for i in "${!SERVICES[@]}"; do
+    SVC="${SERVICES[$i]}"
+    LABEL="${SERVICE_LABELS[$i]}"
+    READY=false
+
+    for attempt in $(seq 1 40); do
+        STATE=$(docker inspect \
+          --format='{{.State.Health.Status}}' \
+          "voidaccess-${SVC}" 2>/dev/null)
+
+        if [ "$STATE" = "healthy" ]; then
+            printf "  ${GREEN}✓${NC}  $LABEL\n"
+            READY=true
+            break
+        fi
+
+        printf "\r  ${CYAN}·${NC}  $LABEL — waiting..."
+        sleep 3
+    done
+
+    if [ "$READY" = "false" ]; then
+        printf "\r  ${YELLOW}⚠${NC}  $LABEL — taking longer than expected\n"
+    fi
+done
 
 # =============================================================================
 # STEP 9: Set Admin Password
