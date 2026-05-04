@@ -265,6 +265,13 @@ ENV_FILE="$SCRIPT_DIR/.env"
 ENV_EXAMPLE="$SCRIPT_DIR/.env.example"
 OVERWRITE=false
 
+# Save existing password BEFORE overwriting — needed to preserve compatibility
+# with an existing postgres_data volume (which only knows the original password).
+OLD_POSTGRES_PASSWORD=""
+if [ -f "$ENV_FILE" ]; then
+    OLD_POSTGRES_PASSWORD=$(grep '^POSTGRES_PASSWORD=' "$ENV_FILE" 2>/dev/null | cut -d= -f2)
+fi
+
 if [ -f "$ENV_FILE" ]; then
     print_info "A .env file already exists."
     response="$(wait_for_key "Overwrite" "N")"
@@ -303,6 +310,16 @@ else
         printf "${RED}  ✗${NC}  Cannot generate secrets — install Python 3\n"
         exit 1
     fi
+fi
+
+# If a postgres_data volume already exists, the running database was
+# initialized with OLD_POSTGRES_PASSWORD.  Generating a new password here
+# would make alembic fail to authenticate.  Reuse the old one instead.
+if docker volume ls --format '{{.Name}}' 2>/dev/null \
+        | grep -qxF "voidaccess_postgres_data" \
+        && [ -n "$OLD_POSTGRES_PASSWORD" ]; then
+    POSTGRES_PASSWORD="$OLD_POSTGRES_PASSWORD"
+    print_info "Existing database volume detected — preserving PostgreSQL password"
 fi
 
 env_update "JWT_SECRET" "$JWT_SECRET"
