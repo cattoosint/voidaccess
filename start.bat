@@ -47,16 +47,15 @@ echo   %DIM% -> %NC% Building and starting containers...
 echo   %DIM%    (first run: 3-5 min, cached after)%NC%
 echo.
 
-:: Run docker compose - wait for it
+:: Run docker compose - detached mode
 docker compose -f %COMPOSE_FILE% ^
-    --project-directory . up --build ^
-    > "%TEMP%\va_start.log" 2>&1
-
+    --project-directory . ^
+    --env-file .env ^
+    up --build -d
 if errorlevel 1 (
-    echo   %RED%[!!]%NC%  Build failed.
-    echo   %DIM% -> %NC% Check: %TEMP%\va_start.log
-    type "%TEMP%\va_start.log" | ^
-        findstr /i "error failed"
+    echo   %RED%[!!]%NC%  Build/start failed.
+    echo   %DIM% -> %NC% Run for details:
+    echo   %DIM%   docker compose -f %COMPOSE_FILE% --project-directory . up --build%NC%
     exit /b 1
 )
 

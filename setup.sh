@@ -26,7 +26,8 @@ find_compose() {
 }
 COMPOSE_FILE=$(find_compose)
 COMPOSE_CMD="docker compose -f $COMPOSE_FILE \
-    --project-directory ."
+    --project-directory . \
+    --env-file .env"
 
 print_ok()   { printf "${GREEN}  ✓${NC}  %s\n" "$1"; }
 print_fail() { printf "${RED}  ✗${NC}  %s\n" "$1"; }
@@ -582,10 +583,6 @@ fi
 # =============================================================================
 print_step "6" "Redis"
 
-print_info "Redis enables JWT token revocation and circuit breaker state."
-print_info "Recommended for production deployments. Skip for local/dev use."
-
-printf "\n"
 printf "  ${DIM}→${NC}  Redis enables JWT token "
 printf "revocation and circuit breaker state.\n"
 printf "  ${DIM}→${NC}  Recommended for production. "
@@ -758,7 +755,6 @@ fi
 if [ -n "$ADMIN_PASS" ]; then
     print_info "Setting admin password..."
     HASH=$($COMPOSE_CMD \
-        --env-file .env \
         exec -T fastapi \
         python3 -c "
 from passlib.context import CryptContext
@@ -768,7 +764,6 @@ print(ctx.hash('$ADMIN_PASS'))
 
     if [ -n "$HASH" ]; then
         $COMPOSE_CMD \
-            --env-file .env \
             exec -T postgres psql \
             -U voidaccess -d voidaccess -c \
             "UPDATE users SET

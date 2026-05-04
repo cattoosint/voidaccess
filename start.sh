@@ -40,7 +40,8 @@ else
 fi
 
 COMPOSE_CMD="docker compose -f $COMPOSE_FILE \
-    --project-directory ."
+    --project-directory . \
+    --env-file .env"
 
 # Banner
 printf "\n"
