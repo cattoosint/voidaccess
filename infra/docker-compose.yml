@@ -85,13 +85,12 @@ services:
       - voidaccess-net
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      # Cold start runs alembic migrations + 32k-entity seed import + uvicorn boot.
-      # That takes ~60-90s on a fresh volume, so give it room before counting
-      # failures. interval is short so dependents (nextjs) see "healthy" quickly
-      # once the service is actually up.
+      # Seed import runs in the background (see infra/docker-entrypoint.sh),
+      # so uvicorn typically boots in ~30s. The generous start_period accounts
+      # for slow VMs / disks / first-time pip cache misses on restart.
       interval: 10s
       timeout: 5s
-      start_period: 180s
+      start_period: 240s
       retries: 5
 
   # Next.js Frontend
