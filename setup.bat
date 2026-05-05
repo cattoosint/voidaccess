@@ -11,7 +11,7 @@ setlocal enabledelayedexpansion
 chcp 65001 >nul
 cd /d "%~dp0"
 
-:: ── Color setup ──────────────────────────────────────────────────────────────
+:: -- Color setup --------------------------------------------------------------
 set "ESC="
 for /f %%a in ('echo prompt $E^| cmd') do set "ESC=%%a"
 set "GREEN=%ESC%[0;32m"
@@ -22,7 +22,7 @@ set "BOLD=%ESC%[1m"
 set "DIM=%ESC%[2m"
 set "NC=%ESC%[0m"
 
-:: ── Opening banner ───────────────────────────────────────────────────────────
+:: -- Opening banner -----------------------------------------------------------
 echo.
 echo %CYAN%  +===================================+%NC%
 echo %CYAN%  ^|                                   ^|%NC%
@@ -32,7 +32,7 @@ echo %CYAN%  ^|                                   ^|%NC%
 echo %CYAN%  +===================================+%NC%
 echo.
 
-:: ── Docker permission check ───────────────────────────────────────────────────
+:: -- Docker permission check ---------------------------------------------------
 docker info >nul 2>&1
 if errorlevel 1 (
     echo %YELLOW%  [^!^!]%NC%  Docker not running or not found.
@@ -42,10 +42,10 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: ── STEP 1: Prerequisites ─────────────────────────────────────────────────────
+:: -- STEP 1: Prerequisites -----------------------------------------------------
 echo.
 echo %CYAN%  +-----------------------------------+%NC%
-echo %CYAN%  ^|%NC%  %BOLD%  1 / 7  ·  Prerequisites%NC%
+echo %CYAN%  ^|%NC%  %BOLD%  1 / 7  -  Prerequisites%NC%
 echo %CYAN%  +-----------------------------------+%NC%
 echo.
 
@@ -80,10 +80,10 @@ if not defined PYTHON (
 echo %GREEN%  [OK]%NC%  Python found.
 echo.
 
-:: ── STEP 2: Environment ───────────────────────────────────────────────────────
+:: -- STEP 2: Environment -------------------------------------------------------
 echo.
 echo %CYAN%  +-----------------------------------+%NC%
-echo %CYAN%  ^|%NC%  %BOLD%  2 / 7  ·  Environment%NC%
+echo %CYAN%  ^|%NC%  %BOLD%  2 / 7  -  Environment%NC%
 echo %CYAN%  +-----------------------------------+%NC%
 echo.
 
@@ -105,11 +105,11 @@ if exist ".env.example" (
 )
 echo.
 
-:: ── STEP 3: Secrets ───────────────────────────────────────────────────────────
+:: -- STEP 3: Secrets -----------------------------------------------------------
 :STEP3
 echo.
 echo %CYAN%  +-----------------------------------+%NC%
-echo %CYAN%  ^|%NC%  %BOLD%  3 / 7  ·  Secrets%NC%
+echo %CYAN%  ^|%NC%  %BOLD%  3 / 7  -  Secrets%NC%
 echo %CYAN%  +-----------------------------------+%NC%
 echo.
 
@@ -121,31 +121,31 @@ call :env_set "POSTGRES_PASSWORD" "!POSTGRES_PASSWORD!"
 echo %GREEN%  [OK]%NC%  Generated JWT_SECRET and POSTGRES_PASSWORD
 echo.
 
-:: ── STEP 4: LLM Provider ─────────────────────────────────────────────────────
+:: -- STEP 4: LLM Provider -----------------------------------------------------
 echo.
 echo %CYAN%  +-----------------------------------+%NC%
-echo %CYAN%  ^|%NC%  %BOLD%  4 / 7  ·  LLM Provider%NC%
+echo %CYAN%  ^|%NC%  %BOLD%  4 / 7  -  LLM Provider%NC%
 echo %CYAN%  +-----------------------------------+%NC%
 echo.
 
 echo   %BOLD%Choose your LLM provider:%NC%
 echo.
-echo   %CYAN%[1]%NC% %BOLD%Groq%NC%          %GREEN%FREE%NC% · No credit card needed
-echo       Llama 3.3 70B · console.groq.com
+echo   %CYAN%[1]%NC% %BOLD%Groq%NC%          %GREEN%FREE%NC% - No credit card needed
+echo       Llama 3.3 70B - console.groq.com
 echo.
 echo   %CYAN%[2]%NC% %BOLD%OpenRouter%NC%    %GREEN%FREE%NC% models available
-echo       100+ models · openrouter.ai
+echo       100+ models - openrouter.ai
 echo.
 echo   %CYAN%[3]%NC% %BOLD%Anthropic%NC%     %YELLOW%Paid%NC%
-echo       Claude models · console.anthropic.com
+echo       Claude models - console.anthropic.com
 echo.
 echo   %CYAN%[4]%NC% %BOLD%OpenAI%NC%        %YELLOW%Paid%NC%
-echo       GPT-4o · platform.openai.com
+echo       GPT-4o - platform.openai.com
 echo.
 echo   %CYAN%[5]%NC% %BOLD%Google Gemini%NC% %GREEN%FREE%NC% tier available
-echo       Gemini 1.5 Flash · aistudio.google.com
+echo       Gemini 1.5 Flash - aistudio.google.com
 echo.
-echo   %CYAN%[6]%NC% %BOLD%Ollama%NC%        %GREEN%FREE%NC% · Fully local
+echo   %CYAN%[6]%NC% %BOLD%Ollama%NC%        %GREEN%FREE%NC% - Fully local
 echo       ollama.ai
 echo.
 echo   %DIM%[7]  Skip for now%NC%
@@ -178,10 +178,10 @@ if "!LLM_CHOICE!"=="6" (
 )
 echo.
 
-:: ── STEP 5: Enrichment Keys ───────────────────────────────────────────────────
+:: -- STEP 5: Enrichment Keys ---------------------------------------------------
 echo.
 echo %CYAN%  +-----------------------------------+%NC%
-echo %CYAN%  ^|%NC%  %BOLD%  5 / 7  ·  Enrichment Keys%NC%
+echo %CYAN%  ^|%NC%  %BOLD%  5 / 7  -  Enrichment Keys%NC%
 echo %CYAN%  +-----------------------------------+%NC%
 echo.
 
@@ -194,10 +194,10 @@ set /p VT_KEY=  VirusTotal API key:
 if defined VT_KEY call :env_set "VT_API_KEY" "!VT_KEY!"
 echo.
 
-:: ── STEP 6: Start Stack ───────────────────────────────────────────────────────
+:: -- STEP 6: Start Stack -------------------------------------------------------
 echo.
 echo %CYAN%  +-----------------------------------+%NC%
-echo %CYAN%  ^|%NC%  %BOLD%  6 / 7  ·  Start Stack%NC%
+echo %CYAN%  ^|%NC%  %BOLD%  6 / 7  -  Start Stack%NC%
 echo %CYAN%  +-----------------------------------+%NC%
 echo.
 
@@ -215,7 +215,7 @@ echo %DIM%   -^>%NC%  Building containers...
 set DOCKER_BUILDKIT=1
 docker compose -f infra/docker-compose.yml --project-directory "%~dp0" --env-file "%~dp0.env" up --build -d > "%TEMP%\va_setup.log" 2>&1
 if errorlevel 1 (
-    echo %RED%  [^!^!]%NC%  Build failed — check %TEMP%\va_setup.log
+    echo %RED%  [^!^!]%NC%  Build failed -- check %TEMP%\va_setup.log
     pause
     exit /b 1
 )
@@ -240,11 +240,11 @@ goto WAIT
 echo.
 echo %YELLOW%  [^!^!]%NC%  Services still starting. Continuing with password setup.
 
-:: ── STEP 7: Admin Password ────────────────────────────────────────────────────
+:: -- STEP 7: Admin Password ----------------------------------------------------
 :STEP7
 echo.
 echo %CYAN%  +-----------------------------------+%NC%
-echo %CYAN%  ^|%NC%  %BOLD%  7 / 7  ·  Admin Password%NC%
+echo %CYAN%  ^|%NC%  %BOLD%  7 / 7  -  Admin Password%NC%
 echo %CYAN%  +-----------------------------------+%NC%
 echo.
 
@@ -275,7 +275,7 @@ if defined HASH (
     echo %YELLOW%  [^!^!]%NC%  Could not set password automatically. Log in and change it via Settings.
 )
 
-:: ── Done ─────────────────────────────────────────────────────────────────────
+:: -- Done ---------------------------------------------------------------------
 :DONE
 echo.
 echo %GREEN%  +===================================+%NC%

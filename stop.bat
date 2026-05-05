@@ -11,7 +11,7 @@ setlocal enabledelayedexpansion
 chcp 65001 >nul
 cd /d "%~dp0"
 
-:: ── Color setup ──────────────────────────────────────────────────────────────
+:: -- Color setup --------------------------------------------------------------
 set "ESC="
 for /f %%a in ('echo prompt $E^| cmd') do set "ESC=%%a"
 set "GREEN=%ESC%[0;32m"
@@ -22,14 +22,14 @@ set "BOLD=%ESC%[1m"
 set "DIM=%ESC%[2m"
 set "NC=%ESC%[0m"
 
-:: ── Banner ────────────────────────────────────────────────────────────────────
+:: -- Banner --------------------------------------------------------------------
 echo.
 echo %CYAN%  +===================================+%NC%
-echo %CYAN%  ^|  VoidAccess  ·  Shutting down     ^|%NC%
+echo %CYAN%  ^|  VoidAccess  -  Shutting down     ^|%NC%
 echo %CYAN%  +===================================+%NC%
 echo.
 
-:: ── Docker permission check ───────────────────────────────────────────────────
+:: -- Docker permission check ---------------------------------------------------
 docker info >nul 2>&1
 if errorlevel 1 (
     echo %YELLOW%  [^!^!]%NC%  Docker not running or not found.
@@ -38,9 +38,9 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: ── Stop containers ───────────────────────────────────────────────────────────
+:: -- Stop containers -----------------------------------------------------------
 echo %DIM%   -^>%NC%  Stopping containers...
-docker compose -f infra\docker-compose.yml --project-directory "%~dp0" down >nul 2>&1
+docker compose -f "%~dp0infra\docker-compose.yml" --project-directory "%~dp0" --env-file "%~dp0.env" down >nul 2>&1
 if errorlevel 1 (
     echo %RED%  [^!^!]%NC%  Failed to stop containers.
     pause

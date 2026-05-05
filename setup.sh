@@ -15,19 +15,21 @@ DIM=$'\033[2m'
 NC=$'\033[0m'
 
 find_compose() {
-    if [ -f "infra/docker-compose.yml" ]; then
-        echo "infra/docker-compose.yml"
-    elif [ -f "docker-compose.yml" ]; then
-        echo "docker-compose.yml"
+    if [ -f "$SCRIPT_DIR/infra/docker-compose.yml" ]; then
+        echo "$SCRIPT_DIR/infra/docker-compose.yml"
+    elif [ -f "$SCRIPT_DIR/docker-compose.yml" ]; then
+        echo "$SCRIPT_DIR/docker-compose.yml"
     else
         printf "  ${RED}✗${NC}  docker-compose.yml not found\n" >&2
         exit 1
     fi
 }
 COMPOSE_FILE=$(find_compose)
+# Absolute paths so --env-file (containing POSTGRES_PASSWORD, JWT_SECRET, etc.)
+# is always resolved correctly even if cwd changes mid-script.
 COMPOSE_CMD="docker compose -f $COMPOSE_FILE \
-    --project-directory . \
-    --env-file .env"
+    --project-directory $SCRIPT_DIR \
+    --env-file $SCRIPT_DIR/.env"
 
 print_ok()   { printf "${GREEN}  ✓${NC}  %s\n" "$1"; }
 print_fail() { printf "${RED}  ✗${NC}  %s\n" "$1"; }

@@ -85,10 +85,14 @@ services:
       - voidaccess-net
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      start_period: 40s
-      retries: 3
+      # Cold start runs alembic migrations + 32k-entity seed import + uvicorn boot.
+      # That takes ~60-90s on a fresh volume, so give it room before counting
+      # failures. interval is short so dependents (nextjs) see "healthy" quickly
+      # once the service is actually up.
+      interval: 10s
+      timeout: 5s
+      start_period: 180s
+      retries: 5
 
   # Next.js Frontend
   nextjs:

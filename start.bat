@@ -1,6 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 chcp 65001 >nul 2>&1
+cd /d "%~dp0"
 
 :: Enable ANSI colors
 for /f %%a in ('echo prompt $E^| cmd') ^
@@ -33,14 +34,14 @@ if not exist .env (
 :: Banner
 echo.
 echo   %CYAN%+===================================+%NC%
-echo   %CYAN%^|%NC%  %BOLD%VoidAccess%NC%  ·  Starting up       %CYAN%^|%NC%
+echo   %CYAN%^|%NC%  %BOLD%VoidAccess%NC%  -  Starting up       %CYAN%^|%NC%
 echo   %CYAN%+===================================+%NC%
 echo.
 
-:: Detect compose file
-set COMPOSE_FILE=infra\docker-compose.yml
-if not exist %COMPOSE_FILE% (
-    set COMPOSE_FILE=docker-compose.yml
+:: Detect compose file (absolute path)
+set "COMPOSE_FILE=%~dp0infra\docker-compose.yml"
+if not exist "%COMPOSE_FILE%" (
+    set "COMPOSE_FILE=%~dp0docker-compose.yml"
 )
 
 echo   %DIM% -> %NC% Building and starting containers...
@@ -48,14 +49,16 @@ echo   %DIM%    (first run: 3-5 min, cached after)%NC%
 echo.
 
 :: Run docker compose - detached mode
-docker compose -f %COMPOSE_FILE% ^
-    --project-directory . ^
-    --env-file .env ^
+:: --env-file uses absolute path so POSTGRES_PASSWORD, JWT_SECRET, etc.
+:: always reach the containers regardless of cwd.
+docker compose -f "%COMPOSE_FILE%" ^
+    --project-directory "%~dp0" ^
+    --env-file "%~dp0.env" ^
     up --build -d
 if errorlevel 1 (
     echo   %RED%[!!]%NC%  Build/start failed.
     echo   %DIM% -> %NC% Run for details:
-    echo   %DIM%   docker compose -f %COMPOSE_FILE% --project-directory . up --build%NC%
+    echo   %DIM%   docker compose -f "%COMPOSE_FILE%" --project-directory "%~dp0" --env-file "%~dp0.env" up --build%NC%
     exit /b 1
 )
 

@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
+
 # Colors
 RED=$'\033[0;31m'
 GREEN=$'\033[0;32m'
@@ -22,26 +25,31 @@ if ! docker info > /dev/null 2>&1; then
 fi
 
 # .env check
-if [ ! -f .env ]; then
+if [ ! -f "$SCRIPT_DIR/.env" ]; then
     printf "\n  ${RED}✗${NC}  No .env found.\n"
     printf "  ${DIM}→${NC}  Run setup first: "
     printf "${BOLD}bash setup.sh${NC}\n\n"
     exit 1
 fi
 
-# Auto-detect compose file
-if [ -f "infra/docker-compose.yml" ]; then
-    COMPOSE_FILE="infra/docker-compose.yml"
-elif [ -f "docker-compose.yml" ]; then
-    COMPOSE_FILE="docker-compose.yml"
+# Auto-detect compose file (absolute path so docker compose finds it
+# regardless of where the user invoked the script from)
+if [ -f "$SCRIPT_DIR/infra/docker-compose.yml" ]; then
+    COMPOSE_FILE="$SCRIPT_DIR/infra/docker-compose.yml"
+elif [ -f "$SCRIPT_DIR/docker-compose.yml" ]; then
+    COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
 else
     printf "\n  ${RED}✗${NC}  docker-compose.yml not found\n\n"
     exit 1
 fi
 
+# Use absolute paths for --project-directory and --env-file. Compose resolves
+# --env-file relative to the current working directory; an absolute path means
+# the variables (POSTGRES_PASSWORD, JWT_SECRET, etc.) always reach containers
+# even if the user invokes start.sh from outside the repo root.
 COMPOSE_CMD="docker compose -f $COMPOSE_FILE \
-    --project-directory . \
-    --env-file .env"
+    --project-directory $SCRIPT_DIR \
+    --env-file $SCRIPT_DIR/.env"
 
 # Banner
 printf "\n"

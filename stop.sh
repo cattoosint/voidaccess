@@ -35,8 +35,13 @@ if ! docker info > /dev/null 2>&1; then
 fi
 
 printf "  ${DIM}→${NC}  Stopping containers...\n"
+ENV_ARG=""
+if [ -f "$SCRIPT_DIR/.env" ]; then
+    ENV_ARG="--env-file $SCRIPT_DIR/.env"
+fi
 docker compose -f "$SCRIPT_DIR/infra/docker-compose.yml" \
     --project-directory "$SCRIPT_DIR" \
+    $ENV_ARG \
     down > /dev/null 2>&1
 printf "  ${GREEN}✓${NC}  All services stopped\n"
 printf "\n"
