@@ -5,11 +5,6 @@
   <p>Automate the entire investigation workflow from query refinement to relationship mapping in 13 autonomous pipeline steps.</p>
 </div>
 
-<div align="center">
-  <img src="./public/setup_gif.gif" width="100%" alt="Setup walkthrough">
-  <img src="./public/start_gif.gif" width="100%" alt="Starting VoidAccess">
-</div>
-
 ---
 
 ## The OSINT Powerhouse
@@ -159,6 +154,10 @@ setup.bat
 
 The interactive wizard creates `.env`, generates `JWT_SECRET` and `POSTGRES_PASSWORD`, prompts for your LLM provider (one of: Groq, OpenRouter, Anthropic, OpenAI, Google Gemini, or Ollama), optionally collects threat-intel keys (`OTX_API_KEY`, `VT_API_KEY`), optionally enables Redis, sets the admin password, and starts the Docker stack.
 
+<div align="center">
+  <img src="./public/setup_gif.gif" width="100%" alt="Setup walkthrough">
+</div>
+
 ### Starting and Stopping
 
 **macOS / Linux / WSL:**
@@ -174,6 +173,10 @@ stop.bat      :: stop all services
 ```
 
 Once running, open **http://localhost:3001** in your browser.
+
+<div align="center">
+  <img src="./public/start_gif.gif" width="100%" alt="Starting VoidAccess">
+</div>
 
 ### Getting a JWT (API access)
 
