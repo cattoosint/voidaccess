@@ -727,6 +727,23 @@ else
 fi
 
 # =============================================================================
+# Ensure MITRE ATT&CK seed dataset is present locally before the import step.
+# The file is gitignored (~45MB) so a fresh clone will not have it on disk.
+# =============================================================================
+MITRE_SEED_PATH="cti_data/enterprise-attack.json"
+MITRE_SEED_URL="https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json"
+if [ ! -f "$MITRE_SEED_PATH" ]; then
+    printf "\n  ${CYAN}▸${NC}  ${MITRE_SEED_PATH} not found — fetching from MITRE...\n"
+    mkdir -p "$(dirname "$MITRE_SEED_PATH")"
+    if ! curl -L --fail --progress-bar -o "$MITRE_SEED_PATH" "$MITRE_SEED_URL"; then
+        printf "  ${RED}✗${NC}  Failed to download MITRE ATT&CK dataset from ${MITRE_SEED_URL}\n"
+        printf "  ${DIM}→${NC}  Check your network connection and re-run setup.sh.\n"
+        exit 1
+    fi
+    printf "  ${GREEN}✓${NC}  MITRE ATT&CK dataset saved to ${MITRE_SEED_PATH}\n"
+fi
+
+# =============================================================================
 # STEP 7: Pre-seed MITRE ATT&CK Cache
 # =============================================================================
 print_step "7" "MITRE ATT&CK Cache"

@@ -245,6 +245,8 @@ voidaccess/
 └── web/           # Next.js 14 + TypeScript + Tailwind frontend
 ```
 
+> **Note on `voidaccess/voidaccess/`** — the nested directory holds the core LLM utilities (`llm.py`, `llm_utils.py`) and is imported at runtime by the API routes (`from voidaccess.llm import ...`). The nested naming reflects the original package structure from the project's pre-API baseline.
+
 ---
 
 ## Troubleshooting

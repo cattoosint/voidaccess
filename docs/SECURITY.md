@@ -28,7 +28,7 @@ The following are not in scope:
 
 ## Reporting
 
-Use GitHub private vulnerability reporting if available. If not, email security@katriel.moses@gmail.com.
+Use GitHub private vulnerability reporting if available. If not, email katriel.moses@gmail.com.
 
 Include in your report:
 

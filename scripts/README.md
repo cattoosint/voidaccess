@@ -30,8 +30,3 @@ PowerShell script that starts Tor on Windows outside of Docker. Not needed when 
 
 ### `crop_logo.py`
 One-time image processing utility used to generate `public/logo_circle.png` from the source logo. Not needed unless the logo is being updated.
-
----
-
-### `cleanup_nuclear.sh` / `dbg.bat`
-Emergency development utilities. `cleanup_nuclear.sh` tears down all Docker volumes and containers for a clean slate. `dbg.bat` is a Windows debug helper. Use with care — `cleanup_nuclear.sh` deletes all local data including the database.

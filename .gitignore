@@ -259,3 +259,4 @@ chroma_db/
 /data/seed_data.json.gz
 coverage/
 *.pytest_tmp
+cti_data/enterprise-attack.json
