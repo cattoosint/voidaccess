@@ -116,9 +116,13 @@ RUN mkdir -p /app/chroma_db && chown -R voidaccess:voidaccess /app/chroma_db
 # always writable by the voidaccess user regardless of the host bind-mount.
 RUN mkdir -p /app/data && chown -R voidaccess:voidaccess /app/data
 
-# Download spaCy model at runtime if not present (defer to first run)
-RUN python -c "import spacy; spacy.load('en_core_web_sm')" 2>/dev/null || \
-    python -m spacy download en_core_web_sm
+# spaCy model download removed 2026-05-16 — Catto runs VoidAccess with
+# LLM/NLP disabled (no OPENROUTER_API_KEY in dev). extractor/ner.py already
+# degrades gracefully when en_core_web_sm is absent (logs a warning, returns
+# empty ORG list, keeps regex-based malware/ransomware detection). The
+# previous download step required outbound HTTPS during `docker build` which
+# was failing intermittently — gating that on actual LLM usage removes the
+# only network dependency in the build.
 
 # Environment variables
 ENV PYTHONPATH=/app
@@ -136,8 +140,13 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Make entrypoint scripts executable
-RUN chmod +x /app/infra/docker-entrypoint.sh \
+# Make entrypoint scripts executable + normalise line endings. Cloning the
+# fork on Windows ends up with CRLF in *.sh and `exec` fails with "no such
+# file or directory" because the kernel reads `#!/bin/bash\r` as the
+# interpreter path. Strip \r at build time so the image is platform-clean.
+RUN sed -i 's/\r$//' /app/infra/docker-entrypoint.sh \
+    && sed -i 's/\r$//' /app/infra/entrypoint.sh \
+    && chmod +x /app/infra/docker-entrypoint.sh \
     && chmod +x /app/infra/*.sh 2>/dev/null || true
 
 # Switch to non-root user
