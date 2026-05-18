@@ -59,7 +59,7 @@ async def enrich_virustotal(entities: list[dict]) -> list[dict]:
     query VirusTotal and return detection stats.
     """
     if not _is_enabled():
-        logger.info("VT_API_KEY not set — VirusTotal hash enrichment disabled")
+        logger.debug("VirusTotal skipped — no API key configured")
         return []
 
     hash_type_map = {
@@ -108,4 +108,6 @@ async def enrich_virustotal(entities: list[dict]) -> list[dict]:
 
             await asyncio.sleep(_VT_RATE_LIMIT_DELAY)
 
+    if results:
+        logger.info("VirusTotal: %d results", len(results))
     return results

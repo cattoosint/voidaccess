@@ -68,9 +68,11 @@ interface Props {
   query: string;
   currentStep?: number | null;
   createdAt?: string | null;
+  onCancelRequest?: () => void;
+  cancelling?: boolean;
 }
 
-export function InvestigationLoadingScreen({ query, currentStep, createdAt }: Props) {
+export function InvestigationLoadingScreen({ query, currentStep, createdAt, onCancelRequest, cancelling }: Props) {
   const [factIndex, setFactIndex] = useState(() => Math.floor(Math.random() * FACTS.length));
   const [visible, setVisible] = useState(true);
   const [dots, setDots] = useState(".");
@@ -284,14 +286,23 @@ export function InvestigationLoadingScreen({ query, currentStep, createdAt }: Pr
         </div>
       </div>
 
-      {/* Footer hint */}
-      <div className="relative z-10 flex h-12 shrink-0 items-center justify-center border-t border-[var(--border-dim)]">
+      {/* Footer — hint + cancel */}
+      <div className="relative z-10 flex h-12 shrink-0 items-center justify-between border-t border-[var(--border-dim)] px-6">
         <p
           className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-muted)]"
           style={{ fontFamily: "var(--font-mono)" }}
         >
           Fanning out across Tor network · Extracting entities · Building relationship graph
         </p>
+        {onCancelRequest && (
+          <button
+            onClick={onCancelRequest}
+            disabled={cancelling}
+            className="flex items-center gap-2 rounded border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-red-400 transition-all hover:border-red-500/60 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {cancelling ? "Cancelling…" : "Cancel investigation"}
+          </button>
+        )}
       </div>
 
       <style>{`

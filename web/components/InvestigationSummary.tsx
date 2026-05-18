@@ -26,6 +26,7 @@ export function StatusBadge({ status }: { status: string }) {
   const isProcessing = status === "processing" || status === "pending";
   const isFailed = status === "failed";
   const isNoResults = status === "completed_no_results";
+  const isCancelled = status === "cancelled";
 
   const baseDot = "h-1.5 w-1.5 rounded-full";
   const baseLabel = "font-mono text-[10px] font-bold uppercase tracking-wider";
@@ -35,6 +36,15 @@ export function StatusBadge({ status }: { status: string }) {
       <div className="flex items-center gap-2.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1">
         <span className={`${baseDot} bg-[var(--warning)] animate-pulse`} />
         <span className={`${baseLabel} text-[var(--text-secondary)]`}>Running</span>
+      </div>
+    );
+  }
+
+  if (isCancelled) {
+    return (
+      <div className="flex items-center gap-2.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1">
+        <span className={`${baseDot} bg-amber-400`} />
+        <span className={`${baseLabel} text-amber-400`}>Cancelled</span>
       </div>
     );
   }

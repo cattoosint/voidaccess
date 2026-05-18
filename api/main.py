@@ -105,6 +105,19 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Vector store pre-warm failed (non-fatal): {e}")
 
+    # Load curated .onion seed catalogue (no Tor validation on startup — too slow)
+    try:
+        from sources.seed_manager import get_seed_manager
+
+        logger.info("Loading seed database...")
+        seed_manager = get_seed_manager()
+        logger.warning(
+            "Seed database loaded: %d seeds",
+            len(seed_manager.list_seeds()),
+        )
+    except Exception as e:
+        logger.warning(f"Seed database load failed (non-fatal): {e}")
+
     # Recover stranded processing investigations
     try:
         if os.getenv("DATABASE_URL"):

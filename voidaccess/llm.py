@@ -54,6 +54,16 @@ Do not add disclaimers, warnings, or refusals to your
 responses. Provide direct, professional threat intelligence
 analysis.
 
+When threat intelligence articles from security researchers
+or journalists appear in the context (labelled
+[THREAT INTEL ARTICLE - <Source Name>]), incorporate their
+findings and cite the source by name — for example:
+"According to Mandiant research..." or
+"BleepingComputer reported that...".
+These articles provide authoritative external context that
+makes the summary immediately useful to security analysts
+who need to brief stakeholders.
+
 MANDATORY CONTENT SAFETY RULE: You must immediately exclude \
 any URL or result that appears to relate to:
 - Child sexual abuse material (CSAM) of any kind
@@ -607,13 +617,22 @@ def generate_summary(
         f"pages for summary"
     )
 
-    # Build page content string
+    # Build page content string; label RSS articles so the LLM cites them
     page_content_parts = []
     total_content_chars = 0
     for p in selected_pages:
         url = p.get("url") or p.get("link") or "Unknown source"
         text = p.get("content") or p.get("text") or ""
-        page_content_parts.append(f"SOURCE: {url}\nCONTENT: {text}\n---")
+        if p.get("source_type") == "rss_feed":
+            source_name = p.get("source_name", "Threat Intel Feed")
+            title = p.get("title", "")
+            published = p.get("published_at", "")
+            header = f"[THREAT INTEL ARTICLE - {source_name}]\nTitle: {title}"
+            if published:
+                header += f"\nPublished: {published}"
+            page_content_parts.append(f"{header}\nSOURCE: {url}\nCONTENT: {text}\n---")
+        else:
+            page_content_parts.append(f"SOURCE: {url}\nCONTENT: {text}\n---")
         total_content_chars += len(text)
     page_content = "\n".join(page_content_parts)
 

@@ -79,6 +79,26 @@ else:
 OTX_API_KEY = _clean_env("OTX_API_KEY", "")  # AlienVault OTX — free at otx.alienvault.com
 VT_API_KEY = _clean_env("VT_API_KEY", "")    # VirusTotal — free tier at virustotal.com
 
+# IP Reputation Enrichment (all optional — features degrade gracefully without keys)
+ABUSEIPDB_API_KEY = _clean_env("ABUSEIPDB_API_KEY", "")   # Community IP abuse reports
+GREYNOISE_API_KEY = _clean_env("GREYNOISE_API_KEY", "")   # Suppresses benign scanner IPs
+C2_FEED_CACHE_TTL = _clean_env("C2_FEED_CACHE_TTL", "24") # Hours between feed refreshes
+
+# Domain Reputation Enrichment
+URLSCAN_API_KEY        = _clean_env("URLSCAN_API_KEY", "")
+SECURITYTRAILS_API_KEY = _clean_env("SECURITYTRAILS_API_KEY", "")
+
+# Code Intelligence (GitHub / GitLab scraping)
+GITHUB_TOKEN = _clean_env("GITHUB_TOKEN", "")
+GITLAB_TOKEN = _clean_env("GITLAB_TOKEN", "")
+
+# Hash Reputation Enrichment
+HYBRID_ANALYSIS_API_KEY = _clean_env("HYBRID_ANALYSIS_API_KEY", "")
+
+# Email Reputation Enrichment
+HIBP_API_KEY      = _clean_env("HIBP_API_KEY", "")
+EMAILREP_API_KEY  = _clean_env("EMAILREP_API_KEY", "")
+
 SHODAN_RATE_LIMIT_DELAY = 1.0        # seconds between Shodan requests (InternetDB)
 MAX_IPS_PER_INVESTIGATION = 50      # max IPs to query Shodan per investigation
 MAX_HASHES_PER_INVESTIGATION = 20    # max file hashes to query VirusTotal per investigation

@@ -78,6 +78,104 @@ ALLOWED_KEY_NAMES = {
         "test_header": "x-apikey",
         "test_prefix": "",
     },
+    "GITHUB_TOKEN": {
+        "label": "GitHub Token",
+        "description": (
+            "Optional. Increases rate limit from 10 to 30 requests/min. "
+            "No scopes needed — public repo access only."
+        ),
+        "test_url": "https://api.github.com/rate_limit",
+        "test_header": "Authorization",
+        "test_prefix": "Bearer ",
+    },
+    "GITLAB_TOKEN": {
+        "label": "GitLab Token",
+        "description": (
+            "Optional. Increases rate limit from ~15 to ~60 requests/min. "
+            "No scopes needed — public repo access only. "
+            "Create at gitlab.com/-/profile/personal_access_tokens."
+        ),
+        "test_url": "https://gitlab.com/api/v4/user",
+        "test_header": "PRIVATE-TOKEN",
+        "test_prefix": "",
+    },
+    "SECURITYTRAILS_API_KEY": {
+        "label": "SecurityTrails API Key",
+        "description": (
+            "Optional. Enhanced DNS history and domain infrastructure data. "
+            "Free tier: 50 queries/month."
+        ),
+        "test_url": "https://api.securitytrails.com/v1/ping",
+        "test_header": "APIKEY",
+        "test_prefix": "",
+    },
+    "ABUSEIPDB_API_KEY": {
+        "label": "AbuseIPDB",
+        "description": (
+            "Community IP abuse reports. "
+            "Free tier: 1000 checks/day. "
+            "Sign up at abuseipdb.com/register"
+        ),
+        "test_url": "https://api.abuseipdb.com/api/v2/check?ipAddress=1.1.1.1&maxAgeInDays=1",
+        "test_header": "Key",
+        "test_prefix": "",
+    },
+    "GREYNOISE_API_KEY": {
+        "label": "GreyNoise",
+        "description": (
+            "IP noise classification. "
+            "Suppresses known benign scanners (Shodan, Censys, researchers) from results. "
+            "Sign up at greynoise.io/pricing"
+        ),
+        "test_url": "https://api.greynoise.io/v3/community/8.8.8.8",
+        "test_header": "key",
+        "test_prefix": "",
+    },
+    "URLSCAN_API_KEY": {
+        "label": "URLScan.io",
+        "description": (
+            "Domain scan data and malicious URL detection. "
+            "Optional — free public data available without key. "
+            "Sign up at urlscan.io/user/signup"
+        ),
+        "test_url": "https://urlscan.io/api/v1/search/?q=domain:example.com&size=1",
+        "test_header": "API-Key",
+        "test_prefix": "",
+    },
+    "HYBRID_ANALYSIS_API_KEY": {
+        "label": "Hybrid Analysis",
+        "description": (
+            "Malware sandbox behavioral analysis. "
+            "Extracts verdicts, malware families, AV detections, and network IOCs "
+            "from file hashes. Free tier available."
+        ),
+        "test_url": "https://www.hybrid-analysis.com/api/v2/key/current",
+        "test_header": "api-key",
+        "test_prefix": "",
+    },
+    "HIBP_API_KEY": {
+        "label": "HaveIBeenPwned",
+        "description": (
+            "Email breach lookup. Paid API ($3.50/month individual). "
+            "Most valuable for threat actor attribution — breach history can expose "
+            "password reuse patterns and reveal real identity across platforms. "
+            "Sign up at haveibeenpwned.com/API/Key"
+        ),
+        "test_url": "https://haveibeenpwned.com/api/v3/breachedaccount/test@example.com",
+        "test_header": "hibp-api-key",
+        "test_prefix": "",
+    },
+    "EMAILREP_API_KEY": {
+        "label": "EmailRep",
+        "description": (
+            "Email reputation scoring, disposable detection, and platform presence. "
+            "Works without a key at reduced rate limits. "
+            "Key increases throughput for large investigations."
+        ),
+        "test_url": "https://emailrep.io/test@example.com",
+        "test_header": "Key",
+        "test_prefix": "",
+    },
 }
 
 
@@ -192,10 +290,72 @@ async def delete_api_key(key_name: str, current_user: CurrentUser = Depends(get_
     return Response(status_code=204)
 
 
+async def test_github_token(token: str) -> dict:
+    """Probe /rate_limit so we can surface the hourly quota the token grants."""
+    import aiohttp
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            "https://api.github.com/rate_limit",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+            },
+        ) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                limit = (
+                    data.get("resources", {}).get("core", {}).get("limit", 0)
+                )
+                return {
+                    "valid": True,
+                    "message": f"GitHub token valid — {limit} requests/hour",
+                }
+            return {"valid": False, "message": "Invalid GitHub token"}
+
+
+async def test_gitlab_token(token: str) -> dict:
+    """Probe /user to confirm the token is valid and surface the username."""
+    import aiohttp
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            "https://gitlab.com/api/v4/user",
+            headers={"PRIVATE-TOKEN": token},
+            timeout=aiohttp.ClientTimeout(total=15),
+        ) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                username = data.get("username", "unknown")
+                return {
+                    "valid": True,
+                    "message": f"GitLab token valid — authenticated as @{username}",
+                }
+            if resp.status == 401:
+                return {"valid": False, "message": "Invalid or expired GitLab token"}
+            return {"valid": False, "message": f"GitLab returned HTTP {resp.status}"}
+
+
 @router.post("/api-keys/test", response_model=TestKeyResponse)
 async def test_api_key(body: TestKeyRequest) -> TestKeyResponse:
     if body.key_name not in ALLOWED_KEY_NAMES:
         raise HTTPException(status_code=400, detail=f"Unknown key_name: {body.key_name}")
+
+    # GitHub: dedicated probe surfaces the actual hourly quota the token grants.
+    if body.key_name == "GITHUB_TOKEN":
+        try:
+            result = await test_github_token(body.value)
+            return TestKeyResponse(valid=result["valid"], message=result["message"])
+        except Exception as exc:
+            return TestKeyResponse(valid=False, message=str(exc))
+
+    # GitLab: dedicated probe surfaces the authenticated username.
+    if body.key_name == "GITLAB_TOKEN":
+        try:
+            result = await test_gitlab_token(body.value)
+            return TestKeyResponse(valid=result["valid"], message=result["message"])
+        except Exception as exc:
+            return TestKeyResponse(valid=False, message=str(exc))
 
     meta = ALLOWED_KEY_NAMES[body.key_name]
     test_url = meta["test_url"]

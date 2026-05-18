@@ -25,6 +25,8 @@ export function useInvestigationPolling({ investigationId, enabled, onUpdate }: 
     if (!res.ok) return;
     const data = (await res.json()) as InvestigationSummary;
     onUpdateRef.current(data);
+    // Return the status so callers can stop polling on terminal states
+    return data.status;
   }, [investigationId]);
 
   useEffect(() => {

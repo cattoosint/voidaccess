@@ -44,7 +44,219 @@ const SOURCE_TOOLTIPS: Record<string, string> = {
   CISA_KEV: "CISA Known Exploited Vulnerabilities",
   MITRE_ATTACK: "MITRE ATT&CK framework",
   dark_web_scrape: "Extracted from dark web pages",
+  paste_site: "Found in a public paste site (clearnet)",
+  Pastebin: "Found in a Pastebin paste",
+  dpaste: "Found in a dpaste paste",
+  "paste.ee": "Found in a paste.ee paste",
+  Rentry: "Found in a Rentry paste",
+  GitHub: "Extracted from a GitHub repository",
+  github: "Extracted from a GitHub repository",
+  GitLab: "Extracted from a GitLab repository",
+  gitlab: "Extracted from a GitLab repository",
+  rss_feed: "Found in a threat intelligence news article",
+  "Krebs on Security": "Found in a Krebs on Security article",
+  BleepingComputer: "Found in a BleepingComputer article",
+  "The Record by Recorded Future": "Found in The Record article",
+  "Cisco Talos Intelligence": "Found in a Talos Intelligence report",
+  "Mandiant Blog": "Found in a Mandiant threat report",
+  "CrowdStrike Blog": "Found in a CrowdStrike intelligence report",
+  "Palo Alto Unit 42": "Found in a Unit 42 threat report",
+  "US-CERT Alerts": "Referenced in a US-CERT advisory",
+  "CISA News": "Referenced in a CISA advisory",
+  "Microsoft Security Blog": "Found in a Microsoft Security report",
 };
+
+const PASTE_SOURCE_NAMES = new Set([
+  "paste_site",
+  "Pastebin",
+  "dpaste",
+  "paste.ee",
+  "Rentry",
+]);
+
+const GITHUB_SOURCE_NAMES = new Set(["GitHub", "github"]);
+
+const GITLAB_SOURCE_NAMES = new Set(["GitLab", "gitlab"]);
+
+const RSS_SOURCE_NAMES = new Set([
+  "rss_feed",
+  "Krebs on Security",
+  "BleepingComputer",
+  "The Record by Recorded Future",
+  "Dark Reading",
+  "SecurityWeek",
+  "Threatpost",
+  "SANS Internet Storm Center",
+  "Malwarebytes Labs",
+  "Cisco Talos Intelligence",
+  "Sophos News",
+  "Mandiant Blog",
+  "CrowdStrike Blog",
+  "Secureworks CTU",
+  "US-CERT Alerts",
+  "CISA News",
+  "FBI Cyber Division News",
+  "Recorded Future Intelligence",
+  "Palo Alto Unit 42",
+  "Microsoft Security Blog",
+  "Google Project Zero",
+]);
+
+function hasPasteSource(sources?: string[]): boolean {
+  if (!sources) return false;
+  return sources.some((s) => PASTE_SOURCE_NAMES.has(s));
+}
+
+function hasGithubSource(sources?: string[]): boolean {
+  if (!sources) return false;
+  return sources.some((s) => GITHUB_SOURCE_NAMES.has(s));
+}
+
+function hasGitlabSource(sources?: string[]): boolean {
+  if (!sources) return false;
+  return sources.some((s) => GITLAB_SOURCE_NAMES.has(s));
+}
+
+function hasRssFeedSource(sources?: string[]): boolean {
+  if (!sources) return false;
+  return sources.some((s) => RSS_SOURCE_NAMES.has(s));
+}
+
+function getRssSourceLabel(sources?: string[]): string {
+  if (!sources) return "News";
+  const named = sources.find(
+    (s) => RSS_SOURCE_NAMES.has(s) && s !== "rss_feed"
+  );
+  return named ?? "News";
+}
+
+function isWaybackArchived(sources?: string[]): boolean {
+  return sources?.includes("wayback_archived") ?? false;
+}
+
+function isUrlscanMalicious(sources?: string[]): boolean {
+  return sources?.includes("urlscan_malicious") ?? false;
+}
+
+function hasCTHistory(sources?: string[]): boolean {
+  return sources?.includes("has_ct_history") ?? false;
+}
+
+function getSubdomainCount(sources?: string[]): number {
+  if (!sources) return 0;
+  for (const s of sources) {
+    if (s.startsWith("subdomain_count_")) {
+      const n = parseInt(s.replace("subdomain_count_", ""), 10);
+      return isNaN(n) ? 0 : n;
+    }
+  }
+  return 0;
+}
+
+function isLikelyTakenDown(sources?: string[]): boolean {
+  return sources?.includes("likely_taken_down") ?? false;
+}
+
+function isHashMalicious(sources?: string[]): boolean {
+  return sources?.includes("hybrid_analysis_malicious") ?? false;
+}
+
+function isHashSuspicious(sources?: string[]): boolean {
+  return (
+    (sources?.includes("hybrid_analysis_suspicious") ?? false) &&
+    !isHashMalicious(sources)
+  );
+}
+
+function isHashClean(sources?: string[]): boolean {
+  return (
+    (sources?.includes("hybrid_analysis_clean") ?? false) &&
+    !isHashMalicious(sources) &&
+    !isHashSuspicious(sources)
+  );
+}
+
+function getMalwareFamilyFromSources(sources?: string[]): string {
+  if (!sources) return "";
+  for (const s of sources) {
+    if (s.startsWith("malware_family_")) {
+      return s.replace("malware_family_", "").replace(/_/g, " ");
+    }
+  }
+  return "";
+}
+
+function getAvDetectionData(
+  sources?: string[]
+): { n: number; total: number } | null {
+  if (!sources) return null;
+  for (const s of sources) {
+    const m = s.match(/^av_detections_(\d+)_of_(\d+)$/);
+    if (m) return { n: parseInt(m[1], 10), total: parseInt(m[2], 10) };
+  }
+  return null;
+}
+
+function isHashEntity(entityType?: string): boolean {
+  return (
+    entityType === "FILE_HASH_MD5" ||
+    entityType === "FILE_HASH_SHA1" ||
+    entityType === "FILE_HASH_SHA256"
+  );
+}
+
+function isEmailEntity(entityType?: string): boolean {
+  return entityType === "EMAIL_ADDRESS";
+}
+
+function isHibpBreached(sources?: string[]): boolean {
+  return sources?.includes("hibp_breached") ?? false;
+}
+
+function getHibpBreachCount(sources?: string[]): number {
+  if (!sources) return 0;
+  for (const s of sources) {
+    if (s.startsWith("hibp_breach_count_")) {
+      const n = parseInt(s.replace("hibp_breach_count_", ""), 10);
+      return isNaN(n) ? 0 : n;
+    }
+  }
+  return 0;
+}
+
+function isHibpPasswordExposed(sources?: string[]): boolean {
+  return sources?.includes("hibp_password_exposed") ?? false;
+}
+
+function isDisposableEmail(sources?: string[]): boolean {
+  return sources?.includes("disposable_email") ?? false;
+}
+
+function isEmailrepMalicious(sources?: string[]): boolean {
+  return sources?.includes("emailrep_malicious") ?? false;
+}
+
+function isCredentialsLeaked(sources?: string[]): boolean {
+  return sources?.includes("credentials_leaked") ?? false;
+}
+
+function isConfirmedC2(sources?: string[]): boolean {
+  return sources?.includes("confirmed_c2") ?? false;
+}
+
+function getC2Family(sources?: string[]): string {
+  if (!sources) return "";
+  for (const s of sources) {
+    if (s.startsWith("confirmed_c2_") && s !== "confirmed_c2") {
+      return s.replace("confirmed_c2_", "").replace(/_/g, " ");
+    }
+  }
+  return "";
+}
+
+function isAbuseConfirmed(sources?: string[]): boolean {
+  return sources?.includes("abuse_confirmed") ?? false;
+}
 
 function getFreshnessColor(tag?: string): string {
   const colors: Record<string, string> = {
@@ -270,6 +482,177 @@ export function EntitySidebar({
                                   }`}
                                 >
                                   {(e.source_count ?? 1) >= 4 ? "✓ " : ""}{(e.source_count ?? 1)} sources
+                                </span>
+                              )}
+                              {hasPasteSource(e.corroborating_sources) && (
+                                <span
+                                  title={SOURCE_TOOLTIPS.paste_site}
+                                  className="shrink-0 rounded bg-amber-700 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                                >
+                                  📋 Paste
+                                </span>
+                              )}
+                              {hasGithubSource(e.corroborating_sources) && (
+                                <span
+                                  title={SOURCE_TOOLTIPS.GitHub}
+                                  className="shrink-0 rounded bg-indigo-700 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                                >
+                                  🐙 GitHub
+                                </span>
+                              )}
+                              {hasGitlabSource(e.corroborating_sources) && (
+                                <span
+                                  title={SOURCE_TOOLTIPS.GitLab}
+                                  className="shrink-0 rounded bg-orange-700 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                                >
+                                  🦊 GitLab
+                                </span>
+                              )}
+                              {hasRssFeedSource(e.corroborating_sources) && (
+                                <span
+                                  title={
+                                    SOURCE_TOOLTIPS[
+                                      getRssSourceLabel(e.corroborating_sources)
+                                    ] ?? SOURCE_TOOLTIPS.rss_feed
+                                  }
+                                  className="shrink-0 rounded bg-teal-700 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                                >
+                                  📰 News
+                                </span>
+                              )}
+                              {isConfirmedC2(e.corroborating_sources) && (
+                                <span
+                                  title={
+                                    getC2Family(e.corroborating_sources)
+                                      ? `Confirmed C2 · ${getC2Family(e.corroborating_sources)}`
+                                      : "Confirmed command-and-control server"
+                                  }
+                                  className="shrink-0 rounded bg-red-700 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                                >
+                                  C2{getC2Family(e.corroborating_sources) ? ` · ${getC2Family(e.corroborating_sources)}` : ""}
+                                </span>
+                              )}
+                              {isAbuseConfirmed(e.corroborating_sources) && (
+                                <span
+                                  title="Community-reported IP abuse (AbuseIPDB)"
+                                  className="shrink-0 rounded bg-orange-600 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                                >
+                                  Reported
+                                </span>
+                              )}
+                              {isWaybackArchived(e.corroborating_sources) && (
+                                <span
+                                  title="Historical snapshots found in Wayback Machine"
+                                  className="shrink-0 rounded bg-purple-700 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                                >
+                                  Archived
+                                </span>
+                              )}
+                              {isUrlscanMalicious(e.corroborating_sources) && (
+                                <span
+                                  title="Flagged malicious by URLScan.io"
+                                  className="shrink-0 rounded bg-red-600 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                                >
+                                  Malicious
+                                </span>
+                              )}
+                              {hasCTHistory(e.corroborating_sources) && (
+                                <span
+                                  title={`${getSubdomainCount(e.corroborating_sources)} subdomains found in certificate transparency logs`}
+                                  className="shrink-0 rounded bg-blue-700 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                                >
+                                  CT Logs {getSubdomainCount(e.corroborating_sources) > 0 ? `·${getSubdomainCount(e.corroborating_sources)}` : ""}
+                                </span>
+                              )}
+                              {isLikelyTakenDown(e.corroborating_sources) && (
+                                <span
+                                  title="Domain appears to have been taken down"
+                                  className="shrink-0 rounded bg-amber-600 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                                >
+                                  Taken Down
+                                </span>
+                              )}
+                              {isHashEntity(e.entity_type) && isHashMalicious(e.corroborating_sources) && (
+                                <span
+                                  title={
+                                    getMalwareFamilyFromSources(e.corroborating_sources)
+                                      ? `Confirmed malware · ${getMalwareFamilyFromSources(e.corroborating_sources)}`
+                                      : "Confirmed malicious by sandbox analysis"
+                                  }
+                                  className="shrink-0 rounded bg-red-700 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                                >
+                                  Malware{getMalwareFamilyFromSources(e.corroborating_sources) ? ` · ${getMalwareFamilyFromSources(e.corroborating_sources)}` : ""}
+                                </span>
+                              )}
+                              {isHashEntity(e.entity_type) && isHashSuspicious(e.corroborating_sources) && (
+                                <span
+                                  title="Flagged suspicious — not confirmed malicious"
+                                  className="shrink-0 rounded bg-orange-600 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                                >
+                                  Suspicious
+                                </span>
+                              )}
+                              {isHashEntity(e.entity_type) && isHashClean(e.corroborating_sources) && (
+                                <span
+                                  title="No detections across checked sources"
+                                  className="shrink-0 rounded bg-gray-600 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                                >
+                                  Clean
+                                </span>
+                              )}
+                              {isHashEntity(e.entity_type) && (() => {
+                                const av = getAvDetectionData(e.corroborating_sources);
+                                if (!av) return null;
+                                return (
+                                  <span
+                                    title={`Detected by ${av.n} of ${av.total} AV vendors`}
+                                    className="shrink-0 rounded bg-blue-700 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                                  >
+                                    {av.n}/{av.total} AV
+                                  </span>
+                                );
+                              })()}
+                              {isEmailEntity(e.entity_type) && isHibpBreached(e.corroborating_sources) && (
+                                <span
+                                  title={(() => {
+                                    const n = getHibpBreachCount(e.corroborating_sources);
+                                    return n > 0 ? `Found in ${n} known data breach${n === 1 ? "" : "es"} (HaveIBeenPwned)` : "Found in known data breaches (HaveIBeenPwned)";
+                                  })()}
+                                  className="shrink-0 rounded bg-red-700 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                                >
+                                  Breached{getHibpBreachCount(e.corroborating_sources) > 0 ? ` ·${getHibpBreachCount(e.corroborating_sources)}` : ""}
+                                </span>
+                              )}
+                              {isEmailEntity(e.entity_type) && isHibpPasswordExposed(e.corroborating_sources) && (
+                                <span
+                                  title="Password hash or plaintext exposed in breach data"
+                                  className="shrink-0 rounded bg-red-900 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                                >
+                                  Pwd Exposed
+                                </span>
+                              )}
+                              {isEmailEntity(e.entity_type) && isDisposableEmail(e.corroborating_sources) && (
+                                <span
+                                  title="Temporary/disposable email address"
+                                  className="shrink-0 rounded bg-gray-600 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                                >
+                                  Disposable
+                                </span>
+                              )}
+                              {isEmailEntity(e.entity_type) && isEmailrepMalicious(e.corroborating_sources) && (
+                                <span
+                                  title="Associated with malicious activity per EmailRep"
+                                  className="shrink-0 rounded bg-orange-600 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                                >
+                                  Malicious
+                                </span>
+                              )}
+                              {isEmailEntity(e.entity_type) && isCredentialsLeaked(e.corroborating_sources) && (
+                                <span
+                                  title="Credentials found in stealer logs"
+                                  className="shrink-0 rounded bg-purple-700 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                                >
+                                  Leaked Creds
                                 </span>
                               )}
                             </div>

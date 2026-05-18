@@ -48,9 +48,9 @@ Get structured summaries and actionable artifacts once the scan completes.
 VoidAccess handles the complexity of dark web research through a rigorous sequence:
 
 1. **LLM Query Refinement**: Optimizes search terms for .onion engine indexing.
-2. **Global Fan-out Search**: Queries 16+ Tor engines across multiple languages.
+2. **Parallel Collection**: Queries 16+ Tor search engines simultaneously with paste sites (Pastebin, dpaste, paste.ee), GitHub, GitLab, and curated RSS security feeds.
 3. **Intelligence Filtering**: LLM filters noise, keeping only relevant intelligence pages.
-4. **Multi-Source Enrichment**: Pulls from AlienVault OTX, abuse.ch, ransomware.live, CISA KEV, and Shodan.
+4. **Multi-Source Enrichment**: Pulls from AlienVault OTX, abuse.ch, ransomware.live, CISA KEV, Shodan, GreyNoise, AbuseIPDB, Feodo Tracker, C2IntelFeeds, and more — running in parallel with collection.
 5. **Recursive .onion Discovery**: Discovers hidden links via seed URL crawling.
 6. **Vector Cache Check**: Avoids redundant scraping for recently visited pages (24h TTL).
 7. **Tor-Routed Scraping**: Safely fetches page content with a 1MB safety cap.
@@ -77,16 +77,35 @@ The extraction pipeline identifies these entity types:
 | **Paste Sites** | Pastebin, Ghostbin, Rentry, and similar links |
 | **People/Orgs** | Named persons, organization names, locations |
 
-Enrichment sources (8 total):
+Parallel collection sources (run alongside Tor search):
+
+- **Paste sites** — Pastebin, dpaste, paste.ee, Rentry
+- **GitHub** — code search and repository READMEs
+- **GitLab** — code search and project pages
+- **RSS security feeds** — 20 curated feeds (Krebs, BleepingComputer, Talos, Mandiant, CrowdStrike, Unit 42, CISA, and more)
+- **Curated .onion seed catalogue** — 31 vetted seeds across 8 categories, scored per query
+
+Enrichment and quality sources (19 total):
 
 - **AlienVault OTX** — threat pulses and malware families
 - **MalwareBazaar** — malware samples and signatures
 - **ThreatFox** — recent IOC feed
 - **URLhaus** — malicious URL database
-- **ransomware.live** — ransomware group tracking
+- **ransomware.live** — ransomware group tracking and leak-site seeds
 - **CISA KEV** — known exploited vulnerabilities catalog
 - **Shodan InternetDB** — passive vulnerability signatures
-- **VirusTotal** — file/URL reputation enrichment (API key required)
+- **VirusTotal** — file hash AV detection ratio (API key required)
+- **GreyNoise** — suppresses known benign scanner IPs from results (API key required)
+- **AbuseIPDB** — community IP abuse reports; 1,000 checks/day free
+- **Feodo Tracker + C2IntelFeeds** — confirmed C2 IPs for 6 major frameworks; no key required
+- **crt.sh** — certificate transparency logs; subdomain enumeration; free
+- **URLScan.io** — live domain scan data and malicious verdicts
+- **Wayback Machine** — historical domain snapshots for taken-down infrastructure
+- **Hybrid Analysis** — behavioral sandbox verdict and AV detection ratio for file hashes
+- **HaveIBeenPwned** — breach history for email addresses (paid API key)
+- **EmailRep** — email reputation scoring and disposable detection
+- **CIRCL PDNS + RDAP** — passive DNS history and WHOIS registration data; free
+- **BlockCypher + Etherscan** — blockchain wallet balance and transaction graph
 
 Export formats:
 
@@ -112,6 +131,27 @@ Export formats:
 
 The default is **DeepSeek via OpenRouter** — fast and strong on technical security content. With free-tier LLMs (Groq free, OpenRouter free models, or Ollama) the cost is **$0**. With paid models like DeepSeek via OpenRouter it is **under $0.50 per investigation**. For fully air-gapped deployments, Ollama runs entirely locally.
 
+### Optional Enrichment API Keys
+
+All enrichment sources that require a key degrade gracefully when the key is absent — they are skipped without failing the investigation. Keys marked "free" require registration but have no cost.
+
+| Key | What it does | Free | Sign up |
+|---|---|---|---|
+| `OTX_API_KEY` | AlienVault OTX threat pulses | Yes | [otx.alienvault.com](https://otx.alienvault.com) |
+| `VT_API_KEY` | VirusTotal file hash AV detections | Yes (4 req/min) | [virustotal.com](https://www.virustotal.com) |
+| `ABUSECH_API_KEY` | MalwareBazaar, ThreatFox, URLhaus rate limits | Yes | [abuse.ch](https://abuse.ch) |
+| `ABUSEIPDB_API_KEY` | Community IP abuse reports; 1,000 checks/day | Yes | [abuseipdb.com/register](https://www.abuseipdb.com/register) |
+| `GREYNOISE_API_KEY` | Suppresses known scanner/researcher IPs | Free tier available | [greynoise.io/pricing](https://www.greynoise.io/pricing) |
+| `URLSCAN_API_KEY` | Higher rate limits for URLScan.io domain scans | Yes (public results without key) | [urlscan.io/user/signup](https://urlscan.io/user/signup) |
+| `HYBRID_ANALYSIS_API_KEY` | Behavioral sandbox analysis for file hashes | Yes | [hybrid-analysis.com/signup](https://www.hybrid-analysis.com/signup) |
+| `HIBP_API_KEY` | Email breach history — the most valuable email enrichment | No ($3.50/month) | [haveibeenpwned.com/API/Key](https://haveibeenpwned.com/API/Key) |
+| `EMAILREP_API_KEY` | Email reputation scoring; increases rate limits | Yes (reduced rate without key) | [emailrep.io/key](https://emailrep.io/key) |
+| `SECURITYTRAILS_API_KEY` | Richer DNS history for domains | Yes (50 queries/month) | [securitytrails.com/corp/api](https://securitytrails.com/corp/api) |
+| `GITHUB_TOKEN` | Raises GitHub scraping from 10 to 30 req/min | Free | [github.com/settings/tokens](https://github.com/settings/tokens) |
+| `GITLAB_TOKEN` | Raises GitLab scraping from 15 to 60 req/min | Free | [gitlab.com/profile/personal_access_tokens](https://gitlab.com/-/profile/personal_access_tokens) |
+| `BLOCKCYPHER_TOKEN` | BTC/ETH wallet balance and transaction graph | Yes | [blockcypher.com](https://www.blockcypher.com) |
+| `ETHERSCAN_API_KEY` | ETH wallet lookups | Yes | [etherscan.io/apis](https://etherscan.io/apis) |
+
 ---
 
 ## Cost Comparison
@@ -124,6 +164,21 @@ The default is **DeepSeek via OpenRouter** — fast and strong on technical secu
 | **VoidAccess** | **Free** | **Yes** | **Yes** |
 
 Free with Groq, OpenRouter free models, or Ollama. Under $0.50 per investigation with paid models like DeepSeek.
+
+---
+
+## What's New in v1.3
+
+- **10 new enrichment sources**: GreyNoise (scanner suppression), AbuseIPDB, Feodo Tracker, C2IntelFeeds, crt.sh, URLScan.io, Wayback Machine, Hybrid Analysis, HaveIBeenPwned, EmailRep
+- **4 new clearnet collection sources**: paste sites, GitHub code search, GitLab code search, and 20 curated RSS security feeds
+- **Curated .onion seed list** — 31 seeds across 8 categories, relevance-scored per query
+- **CIRCL passive DNS + RDAP WHOIS** — infrastructure cluster detection for IPs and domains
+- **Investigation cancellation** — cancel a running pipeline at any checkpoint; partial results are preserved
+- **Sources panel** — per-investigation breakdown of which sources ran and what each returned
+- **Infrastructure clusters panel** — groups IPs and domains sharing ASN, CIDR block, or WHOIS registrant
+- **Entity quality badges** — C2, Malicious, Breached, Disposable, Archived, Taken Down, AV ratio
+- **GreyNoise suppression** — known benign scanner IPs are filtered from entity results automatically
+- **MALWARE_FAMILY auto-creation** from confirmed family names returned by hash enrichment
 
 ---
 

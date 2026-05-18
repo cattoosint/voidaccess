@@ -50,6 +50,14 @@ def _wrap_seed_refresh() -> Coroutine[Any, Any, None]:
     return _run_refresh
 
 
+def _wrap_seed_validation() -> Coroutine[Any, Any, None]:
+    """Create an async job function for .onion seed reachability validation."""
+    async def _run_validation() -> None:
+        await jobs.validate_seeds_job()
+
+    return _run_validation
+
+
 def start_scheduler(llm=None, event_loop: asyncio.AbstractEventLoop | None = None):
     """
     Register interval jobs for each enabled watch. Returns AsyncIOScheduler or None.
@@ -109,12 +117,22 @@ def start_scheduler(llm=None, event_loop: asyncio.AbstractEventLoop | None = Non
         logger.error("Failed to add weekly_seed_refresh job: %s", exc)
 
     try:
+        scheduler.add_job(
+            _wrap_seed_validation(),
+            trigger=CronTrigger(day_of_week="sun", hour=2, minute=0),
+            id="seed_validation",
+            replace_existing=True,
+        )
+    except Exception as exc:
+        logger.error("Failed to add seed_validation job: %s", exc)
+
+    try:
         scheduler.start()
     except Exception as exc:
         logger.error("Scheduler start failed: %s", exc)
         return None
 
-    logger.info("AsyncIOScheduler started with %d jobs", len(watches) + 1)
+    logger.info("AsyncIOScheduler started with %d jobs", len(watches) + 2)
     return scheduler
 
 

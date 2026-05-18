@@ -66,7 +66,7 @@ async def fetch_otx_pulses(query: str, api_key: str, limit: int = 20) -> list[di
     Returns list of dicts with pulse metadata and optional ``indicators``.
     """
     if not (api_key or "").strip():
-        logger.warning("OTX: No API key configured, skipping")
+        logger.debug("OTX skipped — no API key configured")
         return []
 
     headers = {"X-OTX-API-KEY": api_key.strip()}
@@ -85,7 +85,7 @@ async def fetch_otx_pulses(query: str, api_key: str, limit: int = 20) -> list[di
 
                 data = await resp.json()
                 pulses = data.get("results", [])
-                logger.warning("OTX: Found %s pulses for query: %s", len(pulses), query)
+                logger.info("OTX: %d results", len(pulses))
 
                 for pulse in pulses:
                     mf = pulse.get("malware_families") or []
@@ -281,11 +281,7 @@ async def fetch_malwarebazaar(query: str, limit: int = 20) -> list[dict]:
                         return []
                     if data.get("query_status") == "ok":
                         samples = data.get("data") or []
-                        logger.warning(
-                            "MalwareBazaar: Found %s samples for tag: %s",
-                            len(samples),
-                            q,
-                        )
+                        logger.info("MalwareBazaar: %d samples (tag)", len(samples))
                         for sample in samples:
                             results.append(_map_sample(sample))
                         if results:
@@ -300,11 +296,7 @@ async def fetch_malwarebazaar(query: str, limit: int = 20) -> list[dict]:
                 if data.get("query_status") != "ok":
                     return []
                 samples = data.get("data") or []
-                logger.warning(
-                    "MalwareBazaar: Found %s samples for signature: %s",
-                    len(samples),
-                    q,
-                )
+                logger.info("MalwareBazaar: %d samples (signature)", len(samples))
                 for sample in samples:
                     results.append(_map_sample(sample))
 
@@ -372,7 +364,7 @@ async def fetch_threatfox(query: str, limit: int = 50) -> list[dict]:
                     return []
 
                 iocs = data.get("data") or []
-                logger.warning("ThreatFox: Found %s IOCs for query: %s", len(iocs), q)
+                logger.info("ThreatFox: %d results", len(iocs))
 
                 for ioc in iocs[:limit]:
                     conf = ioc.get("confidence_level")
@@ -431,7 +423,7 @@ async def fetch_urlhaus(query: str, limit: int = 20) -> list[dict]:
                     return []
 
                 urls = (data.get("urls") or [])[:limit]
-                logger.warning("URLhaus: Found %s URLs for tag: %s", len(urls), q)
+                logger.info("URLhaus: %d results", len(urls))
 
                 for url_entry in urls:
                     results.append(
@@ -602,7 +594,7 @@ async def fetch_ransomware_live(query: str) -> list[dict]:
                 logger.info("ransomware.live: no groups matched %r", query)
                 return []
 
-            logger.warning("ransomware.live: %d groups matched %r", len(matched_summary), query)
+            logger.info("ransomware.live: %d groups matched %r", len(matched_summary), query)
 
             # ── 2. Fetch full group detail for each match (has ttps, tools, locations) ──
             async def _fetch_group_detail(gname: str) -> Optional[dict]:
@@ -644,10 +636,7 @@ async def fetch_ransomware_live(query: str) -> list[dict]:
                 except Exception:
                     pass
 
-            logger.warning(
-                "ransomware.live: %d recent victims found for matched groups",
-                len(recent_victims),
-            )
+            logger.info("ransomware.live: %d recent victims for matched groups", len(recent_victims))
 
             # ── 4. Assemble results ───────────────────────────────────────────
             for gname, gdata in group_map.items():
@@ -1082,6 +1071,24 @@ def _historical_results_to_pages(results: list[dict]) -> list[dict]:
     return pages
 
 
+async def run_dns_enrichment(extracted_entities: list[dict]) -> dict:
+    """
+    Run DNS/WHOIS enrichment on extracted IP and domain entities.
+    Returns ip_enrichments, domain_enrichments, new_entities, infrastructure_clusters.
+    """
+    try:
+        from sources.dns_enrichment import enrich_with_dns
+        return await enrich_with_dns(extracted_entities)
+    except Exception as e:
+        logger.error("DNS enrichment error: %s", e)
+        return {
+            "ip_enrichments": {},
+            "domain_enrichments": {},
+            "new_entities": [],
+            "infrastructure_clusters": [],
+        }
+
+
 async def enrich_investigation(
     query: str,
     otx_api_key: Optional[str] = None,
@@ -1102,7 +1109,7 @@ async def enrich_investigation(
 
     Completes within ~60s (enforced via ``asyncio.wait_for``).
     """
-    logger.warning("Starting threat intel enrichment for: %s", query)
+    logger.info("Starting threat intel enrichment for: %s", query)
 
     _entities = entities if entities is not None else []
 
@@ -1226,7 +1233,7 @@ async def enrich_investigation(
                 )
 
     total_onion_seeds = sum(1 for p in pages if p.get("_scrape_seed"))
-    logger.warning(
+    logger.info(
         "Enrichment complete: %s OTX pulses, %s MalwareBazaar, "
         "%s ThreatFox IOCs, %s URLhaus, %s ransomware.live groups "
         "(%s .onion seeds) → %s enrichment pages total",

@@ -17,7 +17,17 @@ export type InvestigationStatus =
   | "processing"
   | "completed"
   | "failed"
+  | "cancelled"
+  | "completed_no_results"
   | string;
+
+export type InfraCluster = {
+  type: "shared_ip" | "shared_nameserver" | string;
+  ip?: string;
+  nameserver?: string;
+  domains: string[];
+  description: string;
+};
 
 export type InvestigationSummary = {
   id: number;
@@ -34,6 +44,9 @@ export type InvestigationSummary = {
   current_step: number | null;
   preset?: string | null;
   summary?: string | null;
+  infrastructure_clusters?: InfraCluster[];
+  paste_sources_used?: string[];
+  sources_used?: Record<string, string>;
 };
 
 export type InvestigationEntity = {

@@ -121,6 +121,194 @@ function findPathToHub(fromId: string, graph: Graph, maxDepth = 4): string[] {
   return [];
 }
 
+// ─── Helper: Paste-site source tooltips ─────────────────────────────────────────
+
+const PASTE_SOURCE_TOOLTIPS: Record<string, string> = {
+  paste_site: "Found in a public paste site (clearnet)",
+  Pastebin: "Found in a Pastebin paste",
+  dpaste: "Found in a dpaste paste",
+  "paste.ee": "Found in a paste.ee paste",
+  Rentry: "Found in a Rentry paste",
+};
+
+const PASTE_SOURCE_NAMES = new Set(Object.keys(PASTE_SOURCE_TOOLTIPS));
+
+const GITHUB_SOURCE_TOOLTIPS: Record<string, string> = {
+  GitHub: "Extracted from a GitHub repository",
+  github: "Extracted from a GitHub repository",
+};
+
+const GITHUB_SOURCE_NAMES = new Set(Object.keys(GITHUB_SOURCE_TOOLTIPS));
+
+const GITLAB_SOURCE_TOOLTIPS: Record<string, string> = {
+  GitLab: "Extracted from a GitLab repository",
+  gitlab: "Extracted from a GitLab repository",
+};
+
+const GITLAB_SOURCE_NAMES = new Set(Object.keys(GITLAB_SOURCE_TOOLTIPS));
+
+const RSS_SOURCE_TOOLTIPS: Record<string, string> = {
+  rss_feed: "Found in a threat intelligence news article",
+  "Krebs on Security": "Found in a Krebs on Security article",
+  BleepingComputer: "Found in a BleepingComputer article",
+  "The Record by Recorded Future": "Found in The Record article",
+  "Cisco Talos Intelligence": "Found in a Talos Intelligence report",
+  "Mandiant Blog": "Found in a Mandiant threat report",
+  "CrowdStrike Blog": "Found in a CrowdStrike intelligence report",
+  "Palo Alto Unit 42": "Found in a Unit 42 threat report",
+  "US-CERT Alerts": "Referenced in a US-CERT advisory",
+  "CISA News": "Referenced in a CISA advisory",
+  "Microsoft Security Blog": "Found in a Microsoft Security report",
+  "Dark Reading": "Found in a Dark Reading article",
+  SecurityWeek: "Found in a SecurityWeek article",
+  Threatpost: "Found in a Threatpost article",
+  "SANS Internet Storm Center": "Found in a SANS ISC diary",
+  "Malwarebytes Labs": "Found in a Malwarebytes Labs report",
+  "Sophos News": "Found in a Sophos News article",
+  "Secureworks CTU": "Found in a Secureworks CTU report",
+  "FBI Cyber Division News": "Referenced in an FBI press release",
+  "Recorded Future Intelligence": "Found in a Recorded Future report",
+  "Google Project Zero": "Found in a Google Project Zero post",
+};
+
+const RSS_SOURCE_NAMES = new Set(Object.keys(RSS_SOURCE_TOOLTIPS));
+
+function getPasteSources(sources?: string[]): string[] {
+  if (!sources) return [];
+  return sources.filter((s) => PASTE_SOURCE_NAMES.has(s));
+}
+
+function getGithubSources(sources?: string[]): string[] {
+  if (!sources) return [];
+  return sources.filter((s) => GITHUB_SOURCE_NAMES.has(s));
+}
+
+function getGitlabSources(sources?: string[]): string[] {
+  if (!sources) return [];
+  return sources.filter((s) => GITLAB_SOURCE_NAMES.has(s));
+}
+
+function getRssFeedSources(sources?: string[]): string[] {
+  if (!sources) return [];
+  return sources.filter((s) => RSS_SOURCE_NAMES.has(s));
+}
+
+function isConfirmedC2(sources?: string[]): boolean {
+  return sources?.includes("confirmed_c2") ?? false;
+}
+
+function getC2Family(sources?: string[]): string {
+  if (!sources) return "";
+  for (const s of sources) {
+    if (s.startsWith("confirmed_c2_") && s !== "confirmed_c2") {
+      return s.replace("confirmed_c2_", "").replace(/_/g, " ");
+    }
+  }
+  return "";
+}
+
+function isAbuseConfirmed(sources?: string[]): boolean {
+  return sources?.includes("abuse_confirmed") ?? false;
+}
+
+function isWaybackArchived(sources?: string[]): boolean {
+  return sources?.includes("wayback_archived") ?? false;
+}
+
+function isUrlscanMalicious(sources?: string[]): boolean {
+  return sources?.includes("urlscan_malicious") ?? false;
+}
+
+function hasCTHistory(sources?: string[]): boolean {
+  return sources?.includes("has_ct_history") ?? false;
+}
+
+function getSubdomainCount(sources?: string[]): number {
+  if (!sources) return 0;
+  for (const s of sources) {
+    if (s.startsWith("subdomain_count_")) {
+      const n = parseInt(s.replace("subdomain_count_", ""), 10);
+      return isNaN(n) ? 0 : n;
+    }
+  }
+  return 0;
+}
+
+function isLikelyTakenDown(sources?: string[]): boolean {
+  return sources?.includes("likely_taken_down") ?? false;
+}
+
+function isHashMalicious(sources?: string[]): boolean {
+  return sources?.includes("hybrid_analysis_malicious") ?? false;
+}
+
+function isHashSuspicious(sources?: string[]): boolean {
+  return (
+    (sources?.includes("hybrid_analysis_suspicious") ?? false) &&
+    !isHashMalicious(sources)
+  );
+}
+
+function isHashClean(sources?: string[]): boolean {
+  return (
+    (sources?.includes("hybrid_analysis_clean") ?? false) &&
+    !isHashMalicious(sources) &&
+    !isHashSuspicious(sources)
+  );
+}
+
+function getMalwareFamilyFromSources(sources?: string[]): string {
+  if (!sources) return "";
+  for (const s of sources) {
+    if (s.startsWith("malware_family_")) {
+      return s.replace("malware_family_", "").replace(/_/g, " ");
+    }
+  }
+  return "";
+}
+
+function getAvDetectionData(
+  sources?: string[]
+): { n: number; total: number } | null {
+  if (!sources) return null;
+  for (const s of sources) {
+    const m = s.match(/^av_detections_(\d+)_of_(\d+)$/);
+    if (m) return { n: parseInt(m[1], 10), total: parseInt(m[2], 10) };
+  }
+  return null;
+}
+
+function isHibpBreached(sources?: string[]): boolean {
+  return sources?.includes("hibp_breached") ?? false;
+}
+
+function getHibpBreachCount(sources?: string[]): number {
+  if (!sources) return 0;
+  for (const s of sources) {
+    if (s.startsWith("hibp_breach_count_")) {
+      const n = parseInt(s.replace("hibp_breach_count_", ""), 10);
+      return isNaN(n) ? 0 : n;
+    }
+  }
+  return 0;
+}
+
+function isHibpPasswordExposed(sources?: string[]): boolean {
+  return sources?.includes("hibp_password_exposed") ?? false;
+}
+
+function isDisposableEmail(sources?: string[]): boolean {
+  return sources?.includes("disposable_email") ?? false;
+}
+
+function isEmailrepMalicious(sources?: string[]): boolean {
+  return sources?.includes("emailrep_malicious") ?? false;
+}
+
+function isCredentialsLeaked(sources?: string[]): boolean {
+  return sources?.includes("credentials_leaked") ?? false;
+}
+
 // ─── Helper: Category label ────────────────────────────────────────────────────
 
 const CAT_LABELS: Record<string, string> = {
@@ -471,6 +659,498 @@ export function NodeDetailPanel({ node, graph, searchQuery: _searchQuery, onClos
                     ({sources.slice(0, 3).join(" · ")})
                   </span>
                 )}
+              </span>
+            </div>
+          )}
+
+          {getPasteSources(sources).length > 0 && (
+            <div style={{ ...rowStyle, marginBottom: 8 }}>
+              <span style={labelStyle}>Paste site</span>
+              <span
+                title={
+                  PASTE_SOURCE_TOOLTIPS[getPasteSources(sources)[0]] ??
+                  PASTE_SOURCE_TOOLTIPS.paste_site
+                }
+                style={{
+                  ...valueStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(217,119,6,0.12)",
+                  border: "1px solid rgba(217,119,6,0.4)",
+                  color: "#fbbf24",
+                  fontSize: 11,
+                }}
+              >
+                <span aria-hidden="true">📋</span>
+                {getPasteSources(sources).join(" · ")}
+              </span>
+            </div>
+          )}
+
+          {getGithubSources(sources).length > 0 && (
+            <div style={{ ...rowStyle, marginBottom: 8 }}>
+              <span style={labelStyle}>GitHub</span>
+              <span
+                title={
+                  GITHUB_SOURCE_TOOLTIPS[getGithubSources(sources)[0]] ??
+                  GITHUB_SOURCE_TOOLTIPS.GitHub
+                }
+                style={{
+                  ...valueStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(99,102,241,0.12)",
+                  border: "1px solid rgba(99,102,241,0.4)",
+                  color: "#a5b4fc",
+                  fontSize: 11,
+                }}
+              >
+                <span aria-hidden="true">🐙</span>
+                GitHub
+              </span>
+            </div>
+          )}
+
+          {getGitlabSources(sources).length > 0 && (
+            <div style={{ ...rowStyle, marginBottom: 8 }}>
+              <span style={labelStyle}>GitLab</span>
+              <span
+                title={
+                  GITLAB_SOURCE_TOOLTIPS[getGitlabSources(sources)[0]] ??
+                  GITLAB_SOURCE_TOOLTIPS.GitLab
+                }
+                style={{
+                  ...valueStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(234,88,12,0.12)",
+                  border: "1px solid rgba(234,88,12,0.4)",
+                  color: "#fb923c",
+                  fontSize: 11,
+                }}
+              >
+                <span aria-hidden="true">🦊</span>
+                GitLab
+              </span>
+            </div>
+          )}
+
+          {getRssFeedSources(sources).length > 0 && (
+            <div style={{ ...rowStyle, marginBottom: 8 }}>
+              <span style={labelStyle}>News</span>
+              <span
+                title={
+                  RSS_SOURCE_TOOLTIPS[getRssFeedSources(sources)[0]] ??
+                  RSS_SOURCE_TOOLTIPS.rss_feed
+                }
+                style={{
+                  ...valueStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(20,184,166,0.12)",
+                  border: "1px solid rgba(20,184,166,0.4)",
+                  color: "#5eead4",
+                  fontSize: 11,
+                  maxWidth: 170,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span aria-hidden="true">📰</span>
+                {getRssFeedSources(sources)
+                  .find((s) => s !== "rss_feed") ?? "News"}
+              </span>
+            </div>
+          )}
+
+          {isConfirmedC2(sources) && (
+            <div style={{ ...rowStyle, marginBottom: 8 }}>
+              <span style={labelStyle}>Threat</span>
+              <span
+                title={
+                  getC2Family(sources)
+                    ? `Confirmed C2 · ${getC2Family(sources)}`
+                    : "Confirmed command-and-control server (Feodo Tracker / C2IntelFeeds)"
+                }
+                style={{
+                  ...valueStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(185,28,28,0.18)",
+                  border: "1px solid rgba(239,68,68,0.5)",
+                  color: "#fca5a5",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                C2{getC2Family(sources) ? ` · ${getC2Family(sources)}` : ""}
+              </span>
+            </div>
+          )}
+
+          {isAbuseConfirmed(sources) && (
+            <div style={{ ...rowStyle, marginBottom: 8 }}>
+              <span style={labelStyle}>Abuse</span>
+              <span
+                title="Community-reported IP abuse (AbuseIPDB)"
+                style={{
+                  ...valueStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(194,65,12,0.18)",
+                  border: "1px solid rgba(249,115,22,0.5)",
+                  color: "#fdba74",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                Reported
+              </span>
+            </div>
+          )}
+
+          {isWaybackArchived(sources) && (
+            <div style={{ ...rowStyle, marginBottom: 8 }}>
+              <span style={labelStyle}>Archive</span>
+              <span
+                title="Historical snapshots found in Wayback Machine"
+                style={{
+                  ...valueStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(126,34,206,0.18)",
+                  border: "1px solid rgba(168,85,247,0.5)",
+                  color: "#d8b4fe",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                Archived
+              </span>
+            </div>
+          )}
+
+          {isUrlscanMalicious(sources) && (
+            <div style={{ ...rowStyle, marginBottom: 8 }}>
+              <span style={labelStyle}>URLScan</span>
+              <span
+                title="Flagged malicious by URLScan.io"
+                style={{
+                  ...valueStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(185,28,28,0.18)",
+                  border: "1px solid rgba(239,68,68,0.5)",
+                  color: "#fca5a5",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                Malicious
+              </span>
+            </div>
+          )}
+
+          {hasCTHistory(sources) && (
+            <div style={{ ...rowStyle, marginBottom: 8 }}>
+              <span style={labelStyle}>CT Logs</span>
+              <span
+                title={`${getSubdomainCount(sources)} subdomains found in certificate transparency logs`}
+                style={{
+                  ...valueStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(29,78,216,0.18)",
+                  border: "1px solid rgba(96,165,250,0.5)",
+                  color: "#93c5fd",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                {getSubdomainCount(sources) > 0
+                  ? `${getSubdomainCount(sources)} subdomains`
+                  : "CT history"}
+              </span>
+            </div>
+          )}
+
+          {isLikelyTakenDown(sources) && (
+            <div style={{ ...rowStyle, marginBottom: 8 }}>
+              <span style={labelStyle}>Status</span>
+              <span
+                title="Domain appears to have been taken down"
+                style={{
+                  ...valueStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(180,83,9,0.18)",
+                  border: "1px solid rgba(251,191,36,0.5)",
+                  color: "#fde68a",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                Taken Down
+              </span>
+            </div>
+          )}
+
+          {isHashMalicious(sources) && (
+            <div style={{ ...rowStyle, marginBottom: 8 }}>
+              <span style={labelStyle}>Verdict</span>
+              <span
+                title={
+                  getMalwareFamilyFromSources(sources)
+                    ? `Confirmed malware · ${getMalwareFamilyFromSources(sources)}`
+                    : "Confirmed malicious by sandbox analysis"
+                }
+                style={{
+                  ...valueStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(185,28,28,0.18)",
+                  border: "1px solid rgba(239,68,68,0.5)",
+                  color: "#fca5a5",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                Malware{getMalwareFamilyFromSources(sources) ? ` · ${getMalwareFamilyFromSources(sources)}` : ""}
+              </span>
+            </div>
+          )}
+
+          {isHashSuspicious(sources) && (
+            <div style={{ ...rowStyle, marginBottom: 8 }}>
+              <span style={labelStyle}>Verdict</span>
+              <span
+                title="Flagged suspicious — not confirmed malicious"
+                style={{
+                  ...valueStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(194,65,12,0.18)",
+                  border: "1px solid rgba(249,115,22,0.5)",
+                  color: "#fdba74",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                Suspicious
+              </span>
+            </div>
+          )}
+
+          {isHashClean(sources) && (
+            <div style={{ ...rowStyle, marginBottom: 8 }}>
+              <span style={labelStyle}>Verdict</span>
+              <span
+                title="No detections across checked sources"
+                style={{
+                  ...valueStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(75,85,99,0.18)",
+                  border: "1px solid rgba(156,163,175,0.4)",
+                  color: "#d1d5db",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                Clean
+              </span>
+            </div>
+          )}
+
+          {(() => {
+            const av = getAvDetectionData(sources);
+            if (!av) return null;
+            return (
+              <div style={{ ...rowStyle, marginBottom: 8 }}>
+                <span style={labelStyle}>AV Detection</span>
+                <span
+                  title={`Detected by ${av.n} of ${av.total} AV vendors`}
+                  style={{
+                    ...valueStyle,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                    padding: "2px 8px",
+                    borderRadius: 4,
+                    background: "rgba(29,78,216,0.18)",
+                    border: "1px solid rgba(96,165,250,0.5)",
+                    color: "#93c5fd",
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                >
+                  {av.n}/{av.total} AV
+                </span>
+              </div>
+            );
+          })()}
+
+          {isHibpBreached(sources) && (
+            <div style={{ ...rowStyle, marginBottom: 8 }}>
+              <span style={labelStyle}>Breach</span>
+              <span
+                title={(() => {
+                  const n = getHibpBreachCount(sources);
+                  return n > 0
+                    ? `Found in ${n} known data breach${n === 1 ? "" : "es"} (HaveIBeenPwned)`
+                    : "Found in known data breaches (HaveIBeenPwned)";
+                })()}
+                style={{
+                  ...valueStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(185,28,28,0.18)",
+                  border: "1px solid rgba(239,68,68,0.5)",
+                  color: "#fca5a5",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                Breached{getHibpBreachCount(sources) > 0 ? ` · ${getHibpBreachCount(sources)}` : ""}
+              </span>
+            </div>
+          )}
+
+          {isHibpPasswordExposed(sources) && (
+            <div style={{ ...rowStyle, marginBottom: 8 }}>
+              <span style={labelStyle}>Exposure</span>
+              <span
+                title="Password hash or plaintext exposed in breach data"
+                style={{
+                  ...valueStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(127,7,7,0.25)",
+                  border: "1px solid rgba(239,68,68,0.6)",
+                  color: "#fca5a5",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                Password Exposed
+              </span>
+            </div>
+          )}
+
+          {isDisposableEmail(sources) && (
+            <div style={{ ...rowStyle, marginBottom: 8 }}>
+              <span style={labelStyle}>Email</span>
+              <span
+                title="Temporary/disposable email address"
+                style={{
+                  ...valueStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(75,85,99,0.18)",
+                  border: "1px solid rgba(156,163,175,0.4)",
+                  color: "#d1d5db",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                Disposable
+              </span>
+            </div>
+          )}
+
+          {isEmailrepMalicious(sources) && (
+            <div style={{ ...rowStyle, marginBottom: 8 }}>
+              <span style={labelStyle}>EmailRep</span>
+              <span
+                title="Associated with malicious activity per EmailRep"
+                style={{
+                  ...valueStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(194,65,12,0.18)",
+                  border: "1px solid rgba(249,115,22,0.5)",
+                  color: "#fdba74",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                Malicious
+              </span>
+            </div>
+          )}
+
+          {isCredentialsLeaked(sources) && (
+            <div style={{ ...rowStyle, marginBottom: 8 }}>
+              <span style={labelStyle}>Stealer</span>
+              <span
+                title="Credentials found in stealer logs"
+                style={{
+                  ...valueStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(126,34,206,0.18)",
+                  border: "1px solid rgba(168,85,247,0.5)",
+                  color: "#d8b4fe",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                Leaked Creds
               </span>
             </div>
           )}

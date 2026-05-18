@@ -650,9 +650,27 @@ esac
 print_step "5" "Enrichment Keys"
 
 print_info "Threat intelligence enrichment keys"
-print_info "Press Enter to skip any"
+print_info "Press Enter to skip any key"
 printf "\n"
 
+# Track configured vs skipped counts
+_enrich_configured=0
+_enrich_skipped=0
+
+_save_enrich_key() {
+    local env_key="$1"
+    local value="$2"
+    if [ -n "$value" ]; then
+        env_update "$env_key" "$value"
+        _enrich_configured=$(( _enrich_configured + 1 ))
+    else
+        _enrich_skipped=$(( _enrich_skipped + 1 ))
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Existing: OTX + VirusTotal (tested on entry)
+# ---------------------------------------------------------------------------
 prompt "AlienVault OTX API key (https://otx.alienvault.com): "
 read -rs OTX_KEY || OTX_KEY=""
 printf "\n"
@@ -664,16 +682,21 @@ if [ -n "$OTX_KEY" ]; then
     if [ "$HTTP_CODE" = "200" ]; then
         env_update "OTX_API_KEY" "$OTX_KEY"
         print_ok "OTX API key valid"
+        _enrich_configured=$(( _enrich_configured + 1 ))
     else
         print_warn "Key test failed (HTTP $HTTP_CODE)"
         response="$(wait_for_key "Save anyway" "N")"
         if [ "$response" = "Y" ] || [ "$response" = "y" ]; then
             env_update "OTX_API_KEY" "$OTX_KEY"
             print_info "Saved (untested)"
+            _enrich_configured=$(( _enrich_configured + 1 ))
         else
             print_info "Key discarded"
+            _enrich_skipped=$(( _enrich_skipped + 1 ))
         fi
     fi
+else
+    _enrich_skipped=$(( _enrich_skipped + 1 ))
 fi
 
 printf "\n"
@@ -688,16 +711,106 @@ if [ -n "$VT_KEY" ]; then
     if [ "$HTTP_CODE" = "200" ]; then
         env_update "VT_API_KEY" "$VT_KEY"
         print_ok "VirusTotal API key valid"
+        _enrich_configured=$(( _enrich_configured + 1 ))
     else
         print_warn "Key test failed (HTTP $HTTP_CODE)"
         response="$(wait_for_key "Save anyway" "N")"
         if [ "$response" = "Y" ] || [ "$response" = "y" ]; then
             env_update "VT_API_KEY" "$VT_KEY"
             print_info "Saved (untested)"
+            _enrich_configured=$(( _enrich_configured + 1 ))
         else
             print_info "Key discarded"
+            _enrich_skipped=$(( _enrich_skipped + 1 ))
         fi
     fi
+else
+    _enrich_skipped=$(( _enrich_skipped + 1 ))
+fi
+
+# ---------------------------------------------------------------------------
+# Group A — IP Intelligence
+# ---------------------------------------------------------------------------
+printf "\n${DIM}  ── IP Intelligence ──────────────────${NC}\n\n"
+
+prompt "AbuseIPDB key (free, 1000/day) [https://abuseipdb.com/register]: "
+read -rs ABUSEIPDB_KEY || ABUSEIPDB_KEY=""
+printf "\n"
+_save_enrich_key "ABUSEIPDB_API_KEY" "$ABUSEIPDB_KEY"
+
+printf "\n"
+prompt "GreyNoise key (paid, skip if none): "
+read -rs GREYNOISE_KEY || GREYNOISE_KEY=""
+printf "\n"
+_save_enrich_key "GREYNOISE_API_KEY" "$GREYNOISE_KEY"
+
+# ---------------------------------------------------------------------------
+# Group B — Domain Intelligence
+# ---------------------------------------------------------------------------
+printf "\n${DIM}  ── Domain Intelligence ──────────────${NC}\n\n"
+
+prompt "URLScan.io key (free) [https://urlscan.io/user/signup]: "
+read -rs URLSCAN_KEY || URLSCAN_KEY=""
+printf "\n"
+_save_enrich_key "URLSCAN_API_KEY" "$URLSCAN_KEY"
+
+printf "\n"
+prompt "SecurityTrails key (50/mo free) [https://securitytrails.com/corp/api]: "
+read -rs SECTRAILS_KEY || SECTRAILS_KEY=""
+printf "\n"
+_save_enrich_key "SECURITYTRAILS_API_KEY" "$SECTRAILS_KEY"
+
+# ---------------------------------------------------------------------------
+# Group C — Code Intelligence
+# ---------------------------------------------------------------------------
+printf "\n${DIM}  ── Code Intelligence ────────────────${NC}\n\n"
+
+prompt "GitHub token (free, no scopes) [https://github.com/settings/tokens]: "
+read -rs GITHUB_KEY || GITHUB_KEY=""
+printf "\n"
+_save_enrich_key "GITHUB_TOKEN" "$GITHUB_KEY"
+
+printf "\n"
+prompt "GitLab token (free, read_api) [https://gitlab.com/-/user_settings/personal_access_tokens]: "
+read -rs GITLAB_KEY || GITLAB_KEY=""
+printf "\n"
+_save_enrich_key "GITLAB_TOKEN" "$GITLAB_KEY"
+
+# ---------------------------------------------------------------------------
+# Group D — Hash Intelligence
+# ---------------------------------------------------------------------------
+printf "\n${DIM}  ── Hash Intelligence ────────────────${NC}\n\n"
+
+prompt "Hybrid Analysis key (free) [https://hybrid-analysis.com/signup]: "
+read -rs HYBRID_KEY || HYBRID_KEY=""
+printf "\n"
+_save_enrich_key "HYBRID_ANALYSIS_API_KEY" "$HYBRID_KEY"
+
+# ---------------------------------------------------------------------------
+# Group E — Email Intelligence
+# ---------------------------------------------------------------------------
+printf "\n${DIM}  ── Email Intelligence ───────────────${NC}\n\n"
+
+prompt "HaveIBeenPwned key (\$3.50/mo, skip if none) [https://haveibeenpwned.com/API/Key]: "
+read -rs HIBP_KEY || HIBP_KEY=""
+printf "\n"
+_save_enrich_key "HIBP_API_KEY" "$HIBP_KEY"
+
+printf "\n"
+prompt "EmailRep key (free) [https://emailrep.io/key]: "
+read -rs EMAILREP_KEY || EMAILREP_KEY=""
+printf "\n"
+_save_enrich_key "EMAILREP_API_KEY" "$EMAILREP_KEY"
+
+# ---------------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------------
+printf "\n"
+if [ "$_enrich_configured" -gt 0 ]; then
+    print_ok "$_enrich_configured enrichment key$([ "$_enrich_configured" -ne 1 ] && echo 's') configured"
+fi
+if [ "$_enrich_skipped" -gt 0 ]; then
+    print_info "$_enrich_skipped key$([ "$_enrich_skipped" -ne 1 ] && echo 's') skipped (add later in Settings)"
 fi
 
 # =============================================================================

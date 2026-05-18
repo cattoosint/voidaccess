@@ -6,6 +6,8 @@ import dynamic from "next/dynamic";
 import { EntityDetailsPanel } from "@/components/EntityDetailsPanel";
 import { EntitySidebar } from "@/components/EntitySidebar";
 import { InvestigationSummary } from "@/components/InvestigationSummary";
+import { InfrastructureClusters } from "@/components/InfrastructureClusters";
+import { SourcesPanel } from "@/components/SourcesPanel";
 import { TemporalAnalysisPanel } from "@/components/TemporalAnalysisPanel";
 import { OpsecPanel } from "@/components/OpsecPanel";
 import { StylometryPanel } from "@/components/StylometryPanel";
@@ -62,6 +64,7 @@ export default function InvestigationPage() {
   const [debouncedMinConfidence, setDebouncedMinConfidence] = useState(0.75);
   const [entityMinConfidence, setEntityMinConfidence] = useState(0.75);
   const [defangEnabled, setDefangEnabled] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleMinConfidenceChange = useCallback((value: number) => {
@@ -89,6 +92,28 @@ export default function InvestigationPage() {
   const processing =
     investigation &&
     (investigation.status === "pending" || investigation.status === "processing");
+
+  const handleCancelRequest = useCallback(() => {
+    if (!window.confirm("Cancel this investigation? Partial results collected so far will be kept.")) return;
+    setCancelling(true);
+    const token = getToken();
+    fetch(`/api/investigations/${encodeURIComponent(investigationParamId)}/cancel`, {
+      method: "POST",
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          const msg = (data as { detail?: string }).detail ?? `Error ${res.status}`;
+          alert(msg);
+          setCancelling(false);
+        }
+      })
+      .catch((err) => {
+        alert(err instanceof Error ? err.message : "Failed to cancel");
+        setCancelling(false);
+      });
+  }, [investigationParamId]);
 
   const fetchInvestigation = useCallback(async () => {
     if (!investigationParamId) return;
@@ -136,10 +161,11 @@ export default function InvestigationPage() {
 
   useInvestigationPolling({
     investigationId: investigationParamId,
-    enabled: Boolean(processing),
+    enabled: Boolean(processing) || cancelling,
     onUpdate: (inv) => {
       setInvestigation(inv);
-      if (inv.status === "completed" || inv.status === "failed") {
+      if (inv.status === "completed" || inv.status === "failed" || inv.status === "cancelled") {
+        setCancelling(false);
         void fetchEntities();
         void refetchGraph();
       }
@@ -242,7 +268,15 @@ export default function InvestigationPage() {
   }
 
   if (processing) {
-    return <InvestigationLoadingScreen query={investigation.query} currentStep={investigation.current_step} createdAt={investigation.created_at} />;
+    return (
+      <InvestigationLoadingScreen
+        query={investigation.query}
+        currentStep={investigation.current_step}
+        createdAt={investigation.created_at}
+        onCancelRequest={handleCancelRequest}
+        cancelling={cancelling}
+      />
+    );
   }
 
   return (
@@ -256,6 +290,15 @@ export default function InvestigationPage() {
         pagesCrawled={investigation.page_count ?? 0}
         lastUpdatedLabel={formatRelative(investigation.created_at)}
       />
+
+      {investigation.status === "cancelled" && (
+        <div className="flex items-center gap-3 border-b border-amber-500/20 bg-amber-500/10 px-6 py-2.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />
+          <span className="text-[12px] font-semibold text-amber-400">
+            Investigation cancelled — showing partial results
+          </span>
+        </div>
+      )}
 
       {investigation.refined_query && investigation.refined_query !== investigation.query && (
         <div className="flex items-center gap-2 border-b border-[var(--border-dim)] bg-[var(--bg-surface)] px-6 py-2">
@@ -452,6 +495,12 @@ export default function InvestigationPage() {
               { id: "temporal", label: "Timeline" },
               { id: "opsec", label: "OPSEC" },
               { id: "stylometry", label: "Linguistics" },
+              ...(investigation.infrastructure_clusters && investigation.infrastructure_clusters.length > 0
+                ? [{ id: "infrastructure", label: `Infrastructure (${investigation.infrastructure_clusters.length})` }]
+                : []),
+              ...(investigation.sources_used && Object.keys(investigation.sources_used).length > 0
+                ? [{ id: "sources", label: "Sources" }]
+                : []),
             ].map(panel => (
               <button
                 key={panel.id}
@@ -479,6 +528,23 @@ export default function InvestigationPage() {
             {expandedPanel === "temporal" && <TemporalAnalysisPanel investigationId={investigationParamId} />}
             {expandedPanel === "opsec" && <OpsecPanel entityId={detailsEntity?.id || ""} data={null} loading={false} error={null} onExpand={() => {}} />}
             {expandedPanel === "stylometry" && <StylometryPanel entityId={detailsEntity?.id || ""} data={null} loading={false} error={null} onExpand={() => {}} />}
+            {expandedPanel === "infrastructure" && (
+              <InfrastructureClusters
+                clusters={investigation.infrastructure_clusters ?? []}
+                onHighlightDomains={(domains) => {
+                  const match = entities.find(e =>
+                    domains.some(d => e.value?.includes(d))
+                  );
+                  if (match) {
+                    setSelectedGraphNodeId(match.graph_node_id);
+                    setFocusNodeId(match.graph_node_id);
+                  }
+                }}
+              />
+            )}
+            {expandedPanel === "sources" && (
+              <SourcesPanel sourcesUsed={investigation.sources_used ?? {}} />
+            )}
           </div>
         )}
       </div>

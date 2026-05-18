@@ -203,7 +203,7 @@ async def refresh_seed_data():
     Runs every Sunday at 03:00 UTC.
     """
     logger.warning("Starting weekly seed data refresh...")
-    
+
     try:
         from sources.enrichment import (
             fetch_threatfox, fetch_malwarebazaar
@@ -212,14 +212,36 @@ async def refresh_seed_data():
             import_threatfox_iocs, import_malwarebazaar
         )
         from db.session import get_session
-        
-        tf_results = await fetch_threatfox("", limit=500) 
+
+        tf_results = await fetch_threatfox("", limit=500)
         mb_results = await fetch_malwarebazaar("", limit=500)
-        
+
         with get_session() as session:
             import_threatfox_iocs(session, tf_results)
             import_malwarebazaar(session, mb_results)
-        
+
         logger.warning("Weekly seed refresh complete")
     except Exception as e:
         logger.error(f"Weekly seed refresh failed: {e}")
+
+
+async def validate_seeds_job():
+    """
+    Weekly job: check which curated .onion seeds are still reachable over Tor.
+    Updates status in data/onion_seeds.json. Concurrency is kept low so
+    the validation pass doesn't saturate the Tor circuit.
+    """
+    logger.warning("Starting weekly seed validation...")
+    try:
+        from sources.seed_manager import get_seed_manager
+
+        seed_manager = get_seed_manager()
+        results = await seed_manager.validate_seeds(concurrency=3)
+        logger.warning(
+            "Seed validation complete: %d/%d active, %d unreachable",
+            results.get("active", 0),
+            results.get("checked", 0),
+            results.get("dead", 0),
+        )
+    except Exception as e:
+        logger.error(f"Seed validation failed: {e}")
