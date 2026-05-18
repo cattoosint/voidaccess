@@ -1335,14 +1335,28 @@ async def _run_investigation_task(
             logger.info("[%s] Language detection failed (non-fatal): %s", inv_uuid, e)
 
         # ===== STEP 6: Entity extraction (no session held) =====
-        logger.info("[%s] STEP 6: Extracting entities...", inv_uuid)
+        # Stage 1 (regex IOCs) + Stage 2 (spaCy NER + malware-family
+        # dictionary) always run. Stage 3 (LLM-augmented extraction) is
+        # gated on llm_client being usable — when no LLM key is set or
+        # get_llm raised during query refinement, llm_client stays None
+        # and we skip the LLM stage entirely. This is the Shadow-style
+        # "regex + dictionary, no LLM" mode for deployments without
+        # Groq/Anthropic/Gemini keys.
+        # Operator can also force no-LLM mode via env VOIDACCESS_LLM_DISABLED.
+        import os as _os
+        _llm_disabled = (_os.environ.get("VOIDACCESS_LLM_DISABLED") or "").lower() in ("1", "true", "yes")
+        _run_llm = (llm_client is not None) and not _llm_disabled
+        logger.info(
+            "[%s] STEP 6: Extracting entities (llm_stage=%s)...",
+            inv_uuid, "on" if _run_llm else "off — regex+NER only",
+        )
         extraction_input = non_empty_records if non_empty_records else page_records
         try:
             extraction_results = await extract_entities_from_pages(
                 extraction_input,
                 investigation_id=inv_uuid,
-                llm=llm_client,
-                run_llm_extraction=True,
+                llm=llm_client if _run_llm else None,
+                run_llm_extraction=_run_llm,
             )
             total_entities = sum(r.entity_count for r in extraction_results)
             logger.info("[%s] Extracted %s entities", inv_uuid, total_entities)

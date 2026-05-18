@@ -253,12 +253,18 @@ def get_llm(model_choice, api_keys: dict | None = None):
 
     # Override API keys when per-user keys are available.
     # Map env-var names → LangChain constructor param names.
+    # Groq/OpenRouter are served via ChatOpenAI with base_url overrides, so
+    # their key rides on `api_key` (not `groq_api_key` / `openai_api_key`,
+    # which langchain-groq / older langchain-openai would expect). Wrong
+    # kwarg surfaces as:
+    #   Completions.create() got an unexpected keyword argument 'groq_api_key'
+    # on the first chat call.
     _ENV_TO_LANGCHAIN: dict[str, str] = {
-        "OPENAI_API_KEY":     "openai_api_key",
-        "OPENROUTER_API_KEY": "openai_api_key",
+        "OPENAI_API_KEY":     "api_key",
+        "OPENROUTER_API_KEY": "api_key",
         "ANTHROPIC_API_KEY":  "anthropic_api_key",
         "GOOGLE_API_KEY":     "google_api_key",
-        "GROQ_API_KEY":       "groq_api_key",
+        "GROQ_API_KEY":       "api_key",
     }
     if api_keys:
         for key_name, key_value in api_keys.items():
