@@ -126,6 +126,7 @@ async def export_entity_stix(
             entity = session.query(Entity).filter_by(id=eid).first()
             if entity is None:
                 raise HTTPException(status_code=404, detail="Entity not found")
+            _assert_entity_accessible(session, eid, current_user.user.id)
 
             try:
                 from export.stix import entity_to_stix_indicator, entity_to_stix_threat_actor, entity_to_stix_malware, bundle_to_json  # noqa: PLC0415
@@ -179,6 +180,7 @@ async def export_entity_json(
             entity = session.query(Entity).filter_by(id=eid).first()
             if entity is None:
                 raise HTTPException(status_code=404, detail="Entity not found")
+            _assert_entity_accessible(session, eid, current_user.user.id)
 
             appearances = get_entity_appearances(session, eid, current_user.user.id)
             data = _entity_to_dict(entity)
@@ -218,6 +220,7 @@ async def get_entity_related(
             entity = session.query(Entity).filter_by(id=eid).first()
             if entity is None:
                 raise HTTPException(status_code=404, detail="Entity not found")
+            _assert_entity_accessible(session, eid, current_user.user.id)
 
             rels = (
                 session.query(EntityRelationship)
@@ -565,6 +568,7 @@ async def get_entity(
             entity = session.query(Entity).filter_by(id=eid).first()
             if entity is None:
                 raise HTTPException(status_code=404, detail="Entity not found")
+            _assert_entity_accessible(session, eid, current_user.user.id)
 
             source_url = ""
             try:
@@ -737,6 +741,36 @@ def _parse_uuid(entity_id: str) -> uuid.UUID:
         return uuid.UUID(entity_id)
     except ValueError:
         raise HTTPException(status_code=422, detail="Invalid entity ID format")
+
+
+def _assert_entity_accessible(session, entity_id: uuid.UUID, user_id: int) -> None:
+    """Raise HTTP 404 if this entity is not reachable by the given user."""
+    import sqlalchemy as sa  # noqa: PLC0415
+    from db.models import Entity, Investigation, InvestigationEntityLink  # noqa: PLC0415
+
+    user_inv_ids = (
+        session.query(Investigation.id)
+        .filter(Investigation.user_id == user_id)
+        .subquery()
+    )
+    linked_entity_ids = (
+        session.query(InvestigationEntityLink.entity_id)
+        .filter(InvestigationEntityLink.investigation_id.in_(user_inv_ids))
+        .subquery()
+    )
+    accessible = (
+        session.query(Entity.id)
+        .filter(
+            sa.or_(
+                Entity.investigation_id.in_(user_inv_ids),
+                Entity.id.in_(linked_entity_ids),
+            ),
+            Entity.id == entity_id,
+        )
+        .first()
+    )
+    if accessible is None:
+        raise HTTPException(status_code=404, detail="Entity not found")
 
 
 def _entity_to_dict(entity) -> dict:  # type: ignore[type-arg]
