@@ -1822,6 +1822,7 @@ async def create_investigation(
 async def list_investigations(
     limit: int = Query(default=20, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    current_user: "CurrentUser" = Depends(get_current_user),
 ) -> list[dict]:
     """Return a paginated list of investigation summaries."""
     if not os.getenv("DATABASE_URL"):
@@ -1834,6 +1835,7 @@ async def list_investigations(
             invs = (
                 session.query(Investigation)
                 .filter(Investigation.is_seed == False)
+                .filter(Investigation.user_id == current_user.id)
                 .order_by(Investigation.created_at.desc())
                 .offset(offset)
                 .limit(limit)
