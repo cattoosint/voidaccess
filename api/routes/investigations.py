@@ -344,14 +344,33 @@ async def _update_progress(
 
 
 async def _get_investigation_model_choice(model: Optional[str]) -> tuple[str, Any]:
-    """Get model choices and selected model in a short-lived session."""
+    """Get model choices and selected model in a short-lived session.
+
+    When VOIDACCESS_LLM_DISABLED=true OR no LLM keys are configured, return
+    the DEFAULT_MODEL string as a placeholder and an empty choice list. The
+    downstream pipeline never actually calls into an LLM in that mode —
+    get_llm() raises ValueError on first use → llm_client stays None →
+    refine_query / filter_results / entity extraction all fall through to
+    their pre-existing no-LLM paths."""
+    import os
     from db.session import get_session
     from voidaccess.llm_utils import get_model_choices
     import config as config_module
 
+    llm_disabled = (os.environ.get("VOIDACCESS_LLM_DISABLED") or "").lower() in ("1", "true", "yes")
+
     with get_session() as session:
         model_choices = get_model_choices()
         if not model_choices:
+            if llm_disabled:
+                # Operator opted out of LLM. Return placeholder so the
+                # pipeline can proceed; pipeline already gates per-step.
+                selected_model = (
+                    model
+                    or config_module.DEFAULT_MODEL
+                    or "openrouter/deepseek/deepseek-chat"
+                )
+                return selected_model, []
             raise RuntimeError("No LLM models available")
         selected_model = (
             model
