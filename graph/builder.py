@@ -443,6 +443,22 @@ def build_graph_from_db(
     if not os.getenv("DATABASE_URL"):
         return graph
 
+    # Guard (2026-05-24): refuse an unbounded global graph build. With no
+    # investigation_id AND no `since` filter, the query below loads the entire
+    # entity table into an in-memory MultiDiGraph with O(n²) per-page edge
+    # construction — multiple GB on a populated DB. Every legitimate caller
+    # passes an investigation_id (see api/routes/investigations.py, export/
+    # stix.py); the only None caller was a fire-and-forget watch step that has
+    # been removed. Returning an empty graph here is the safety net against
+    # re-introducing that memory bomb.
+    if investigation_id is None and since is None:
+        logger.warning(
+            "build_graph_from_db called with no investigation_id and no "
+            "`since` filter — refusing unbounded global graph build; "
+            "returning empty graph."
+        )
+        return graph
+
     try:
         from db.session import get_session  # noqa: PLC0415
         from db.models import Entity, EntityRelationship  # noqa: PLC0415

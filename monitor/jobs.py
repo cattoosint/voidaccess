@@ -107,12 +107,15 @@ async def run_keyword_watch(watch: dict, llm=None) -> dict[str, Any]:
             logger.error("extract_entities_from_pages failed: %s", exc)
             errors.append(str(exc))
 
-    try:
-        import graph
-        graph.build_graph_from_db()
-    except Exception as exc:
-        logger.warning("build_graph_from_db: %s", exc)
-        errors.append(f"graph: {exc}")
+    # NOTE (2026-05-24): removed an unscoped graph.build_graph_from_db() call
+    # that ran here on every watch cycle. With no investigation_id it loaded
+    # the ENTIRE entity table (~38k rows) into an in-memory MultiDiGraph with
+    # O(n²) per-page edge construction — and then discarded the result. On the
+    # uncapped VoidAccess container this ballooned past host RAM and caused a
+    # ~3h daily host-wide swap-thrash livelock at ~04:00 SGT (when one of the
+    # 6-hourly watches fired). The investigation graph is built on demand,
+    # scoped per investigation_id, via api/routes/investigations.py — so this
+    # fire-and-forget global rebuild served no purpose.
 
     return {
         "name": name,
